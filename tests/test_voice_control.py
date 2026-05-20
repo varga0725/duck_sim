@@ -1,72 +1,88 @@
 import pytest
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
-from duck_agent_sim.agent.voice_control import LocalVoiceController
+from duck_agent_sim.agent.voice_control import LocalVoiceController, COMMAND_MAP
 
-def test_parse_command_hungarian():
-    """Tests if Hungarian spoken commands are correctly parsed into robot actions."""
+
+def test_hungarian_command_regex_patterns():
+    """Verify that Hungarian spoken commands are correctly recognized by COMMAND_MAP regexes."""
+    
+    # walk_forward
+    assert COMMAND_MAP["walk_forward"].search("Menj előre kérlek") is not None
+    assert COMMAND_MAP["walk_forward"].search("sétálj előre") is not None
+    assert COMMAND_MAP["walk_forward"].search("előre") is not None
+    
+    # walk_backward
+    assert COMMAND_MAP["walk_backward"].search("Menj hátra") is not None
+    assert COMMAND_MAP["walk_backward"].search("sétálj hátra gyorsan") is not None
+    
+    # turn_left
+    assert COMMAND_MAP["turn_left"].search("fordulj balra") is not None
+    assert COMMAND_MAP["turn_left"].search("menj balra") is not None
+    
+    # turn_right
+    assert COMMAND_MAP["turn_right"].search("fordulj jobbra most") is not None
+    
+    # stop
+    assert COMMAND_MAP["stop"].search("állj meg!") is not None
+    assert COMMAND_MAP["stop"].search("stop") is not None
+    
+    # reset
+    assert COMMAND_MAP["reset"].search("indítsd újra a rendszert") is not None
+    assert COMMAND_MAP["reset"].search("alaphelyzet") is not None
+    
+    # follow_chair
+    assert COMMAND_MAP["follow_chair"].search("kövesd a széket") is not None
+    assert COMMAND_MAP["follow_chair"].search("keresd a széket") is not None
+    
+    # stop_following
+    assert COMMAND_MAP["stop_following"].search("ne kövesd tovább") is not None
+    assert COMMAND_MAP["stop_following"].search("állítsd le a követést") is not None
+
+
+def test_resolve_device():
+    """Tests if audio devices are correctly resolved by integer or name substring matching."""
     controller = LocalVoiceController()
     
-    # Positive forward commands
-    assert controller.parse_command("Menj előre kérlek") == "walk_forward"
-    assert controller.parse_command("sétálj előre") == "walk_forward"
-    assert controller.parse_command("előre") == "walk_forward"
+    # Test direct integer string
+    assert controller.resolve_device("3") == 3
     
-    # Positive backward commands
-    assert controller.parse_command("Menj hátra") == "walk_backward"
-    assert controller.parse_command("sétálj hátra gyorsan") == "walk_backward"
-    
-    # Positive turn commands
-    assert controller.parse_command("fordulj balra") == "turn_left"
-    assert controller.parse_command("fordulj jobbra most") == "turn_right"
-    
-    # Positive stop and reset commands
-    assert controller.parse_command("állj meg!") == "stop"
-    assert controller.parse_command("indítsd újra a rendszert") == "reset"
-    assert controller.parse_command("alaphelyzet") == "reset"
-    
-    # Positive follower commands
-    assert controller.parse_command("kövesd a széket") == "follow_chair"
-    assert controller.parse_command("keresd a széket") == "follow_chair"
-    assert controller.parse_command("ne kövesd tovább") == "stop_following"
-    assert controller.parse_command("állítsd le a követést") == "stop_following"
-
-    # Negative / unmatched commands
-    assert controller.parse_command("valami más szöveg") is None
-    assert controller.parse_command("szeretem a kacsákat") is None
+    # Test name match with mock list
+    with patch("speech_recognition.Microphone.list_microphone_names", return_value=["Default", "iPhone Microphone", "External Mic"]):
+        assert controller.resolve_device("iPhone") == 1
+        assert controller.resolve_device("External") == 2
+        assert controller.resolve_device("Nonexistent") is None
 
 
 @pytest.mark.anyio
-async def test_execute_action_mapping():
-    """Tests if parsed actions call the underlying client API correctly."""
-    controller = LocalVoiceController()
+async def test_start_voice_loop_calls_agent():
+    """Verify that start_voice_loop pre-warms the agent, transcribes input, routes to DuckAgent, and speaks response."""
+    controller = LocalVoiceController(live=False)
     
-    # Mock the client endpoints
-    controller.client.send_command = AsyncMock()
-    controller.client.stop = AsyncMock()
-    controller.client.reset = AsyncMock()
-    controller.client.start_following = AsyncMock()
-    controller.client.stop_following = AsyncMock()
-
-    # Test walk_forward
-    await controller.execute_action("walk_forward")
-    controller.client.send_command.assert_called_with(command="walk_forward", speed=0.3, turn=0.0, duration_sec=1.5)
+    # Mock DuckAgent methods
+    controller.agent.start = AsyncMock()
+    controller.agent.stop = AsyncMock()
     
-    # Test turn_left
-    await controller.execute_action("turn_left")
-    controller.client.send_command.assert_called_with(command="turn_left", speed=0.0, turn=0.4, duration_sec=1.2)
-
-    # Test stop
-    await controller.execute_action("stop")
-    controller.client.stop.assert_called_once()
-
-    # Test reset
-    await controller.execute_action("reset")
-    controller.client.reset.assert_called_once()
-
-    # Test follow_chair
-    await controller.execute_action("follow_chair")
-    controller.client.start_following.assert_called_once()
+    mock_response = MagicMock()
+    mock_response.source = "direct"
+    mock_response.action = "walk_forward"
+    mock_response.latency_ms = 50.0
+    mock_response.hermes_raw = ""
+    mock_response.success = True
+    mock_response.speech = "Haladok előre."
     
-    # Test stop_following
-    await controller.execute_action("stop_following")
-    controller.client.stop_following.assert_called_once()
+    controller.agent.process_with_intent = AsyncMock(return_value=(None, mock_response))
+    
+    # Mock listen_and_process_sync to yield one command then raise KeyboardInterrupt to exit loop
+    controller.listen_and_process_sync = MagicMock(side_effect=["menj előre", KeyboardInterrupt])
+    controller.speak = MagicMock()
+    
+    with pytest.raises(SystemExit):
+        with patch("sys.exit") as mock_exit:
+            mock_exit.side_effect = SystemExit(0)
+            await controller.start_voice_loop()
+            
+    controller.agent.start.assert_awaited_once()
+    controller.agent.process_with_intent.assert_awaited_once_with("menj előre")
+    controller.speak.assert_called_once_with("Haladok előre.")
+    controller.agent.stop.assert_awaited_once()

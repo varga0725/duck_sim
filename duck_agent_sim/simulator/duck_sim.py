@@ -697,6 +697,10 @@ class RealDuckSimulator(DuckSimulator):
             self.data.qvel[0] = global_vx
             self.data.qvel[1] = global_vy
 
+            # Direct 500Hz position integration to bypass feet contact friction sticking/slipping
+            self.data.qpos[0] += global_vx * 0.002
+            self.data.qpos[1] += global_vy * 0.002
+
             # 5. Enforce base angular rates (damp roll/pitch completely, enforce yaw command)
             self.data.qvel[3] = 0.0
             self.data.qvel[4] = 0.0

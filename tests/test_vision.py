@@ -107,3 +107,63 @@ def test_webcam_mode_config_and_blank_fallback(monkeypatch):
         assert frame.shape == (480, 640, 3)
     finally:
         sim.close()
+
+def test_detect_real_projected_capsule_cylinder(monkeypatch):
+    import numpy as np
+    import mujoco
+    from unittest.mock import MagicMock
+    from duck_agent_sim.simulator import instance
+    
+    # Mock active_simulator
+    mock_sim = MagicMock()
+    mock_model = MagicMock()
+    mock_data = MagicMock()
+    
+    # Set up simulator model and data mocks
+    mock_sim.model = mock_model
+    mock_sim.data = mock_data
+    mock_sim._lock = MagicMock()
+    
+    # Set up global camera attributes
+    mock_model.vis.global_.fovy = 45.0
+    mock_data.cam_xpos = {0: np.array([0.0, 0.0, 1.0])}
+    mock_data.cam_xmat = {0: np.identity(3).flatten()}
+    
+    # Mock mj_name2id
+    def name2id_side_effect(model, obj_type, name):
+        if obj_type == mujoco.mjtObj.mjOBJ_CAMERA:
+            return 0
+        if obj_type == mujoco.mjtObj.mjOBJ_BODY:
+            if name == "person":
+                return 4
+        raise KeyError()
+    
+    monkeypatch.setattr(mujoco, "mj_name2id", name2id_side_effect)
+    
+    # Mock model geom addresses
+    mock_model.body_geomadr = {4: 0}
+    mock_model.body_geomnum = {4: 2}
+    
+    # Geoms for body 4 (person):
+    # Geom 0: mjGEOM_CAPSULE
+    # Geom 1: mjGEOM_CYLINDER
+    mock_model.geom_type = {0: mujoco.mjtGeom.mjGEOM_CAPSULE, 1: mujoco.mjtGeom.mjGEOM_CYLINDER}
+    mock_data.geom_xpos = {0: np.array([0.0, 0.0, -0.5]), 1: np.array([0.0, 0.0, -1.0])}
+    mock_data.geom_xmat = {0: np.identity(3).flatten(), 1: np.identity(3).flatten()}
+    mock_model.geom_size = {0: np.array([0.15, 0.35, 0.0]), 1: np.array([0.05, 0.2, 0.0])}
+    
+    # Patch active_simulator
+    monkeypatch.setattr(instance, "active_simulator", mock_sim)
+    
+    detector = YOLODetector()
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    
+    # Call _detect_real_projected
+    projected = detector._detect_real_projected(frame)
+    
+    # Verify that the person was projected
+    assert len(projected) == 1
+    assert projected[0]["label"] == "person"
+    assert projected[0]["confidence"] == 0.99
+    assert len(projected[0]["bbox"]) == 4
+

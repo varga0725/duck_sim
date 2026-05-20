@@ -105,7 +105,7 @@ class YOLODetector:
                 cam_pos = data.cam_xpos[cam_id]
                 cam_mat = data.cam_xmat[cam_id].reshape(3, 3)
                 
-                for label in ["chair", "table", "sports_ball"]:
+                for label in ["chair", "table", "sports_ball", "person"]:
                     try:
                         body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, label)
                     except Exception:
@@ -135,6 +135,16 @@ class YOLODetector:
                                     v = np.zeros(3)
                                     v[axis] = sign * r
                                     local_verts.append(v)
+                        elif g_type in [mujoco.mjtGeom.mjGEOM_CAPSULE, mujoco.mjtGeom.mjGEOM_CYLINDER]:
+                            r, hh = g_size[:2]
+                            for sz in [-hh, hh]:
+                                local_verts.append(np.array([0.0, 0.0, sz]))
+                                for axis in [0, 1]:
+                                    for sign in [-1, 1]:
+                                        v = np.zeros(3)
+                                        v[axis] = sign * r
+                                        v[2] = sz
+                                        local_verts.append(v)
                         else:
                             local_verts.append(np.zeros(3))
                             

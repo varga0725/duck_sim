@@ -89,6 +89,17 @@
             <geom type="sphere" size="0.1" material="mat_ball" mass="0.4" contype="1" conaffinity="1"/>
         </body>
         
+        <!-- Person in a far corner (static) -->
+        <body name="person" pos="-2.5 2.5 0" euler="0 0 -45">
+            <!-- Torso / Blue Shirt -->
+            <geom type="capsule" pos="0 0 0.85" size="0.15 0.35" rgba="0.2 0.4 0.8 1" contype="1" conaffinity="1"/>
+            <!-- Head / Skin tone -->
+            <geom type="sphere" pos="0 0 1.35" size="0.15" rgba="0.9 0.7 0.6 1" contype="1" conaffinity="1"/>
+            <!-- Legs / Dark Grey Pants -->
+            <geom type="cylinder" pos="-0.07 0 0.2" size="0.05 0.2" rgba="0.15 0.15 0.15 1" contype="1" conaffinity="1"/>
+            <geom type="cylinder" pos="0.07 0 0.2" size="0.05 0.2" rgba="0.15 0.15 0.15 1" contype="1" conaffinity="1"/>
+        </body>
+        
     </worldbody>
 
     <keyframe>

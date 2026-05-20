@@ -1,3 +1,5 @@
 name: duck-robot
-version: "1.0.0"
-description: "Nous Research Hermes native plugin for Duck Robot simulation control."
+version: "1.1.0"
+description: "Nous Research Hermes native plugin for Duck Robot simulation control. Provides tight multi-modal integration: see (vision capture), hear (speech-to-text), and speak (text-to-speech)."
+author: "Nous Research"
+category: robotics
