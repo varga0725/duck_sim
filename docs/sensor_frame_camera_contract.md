@@ -403,11 +403,11 @@ Az alábbi adatok részben elérhetők belsőleg vagy levezethetők, de jelenleg
    - MuJoCo szenzorok léteznek (`left_foot_pos`, `right_foot_pos`, `*_global_linvel`), de a REST API csak `feet_contact` booleant publikál.
 5. Sebességmező a `RobotState`-ben:
    - a feladatban szereplő `velocity` frame jelenleg csak belső `_ringbuffer` snapshotban létezik, nem publikus schema mező.
-7. Pontos safety height threshold API-szinten:
+6. Pontos safety height threshold API-szinten:
    - Megoldva a stability contract részeként: `RobotState.stability.min_body_height_m`, `RobotState.stability.internal_fallen_min_body_height_m`, `RobotState.stability.agent_preflight_min_body_height_m`, valamint `RobotState.stability.thresholds.*` publikálja az effektív küszöböket.
    - `SafetyConfig.min_body_height_m` opcionális belső fallen magasságküszöb override.
    - A belső fallen threshold és az agent preflight guard külön mezők, mert eltérő safety jelentésük van.
-
+7. Frame névkonvenciók formális leírása:
    - a világframe tengelyirányai és a robot forward/lateral/up tengelyek nincsenek külön REP-szerű dokumentumban rögzítve.
 8. Szenzor covariance/noise modell:
    - a MuJoCo szenzorokhoz és perception detekciókhoz nincs publikált zajmodell vagy covariance.
@@ -427,8 +427,9 @@ Az alábbi adatok részben elérhetők belsőleg vagy levezethetők, de jelenleg
    - real módban opcionális teljes `fpv -> head_assembly -> base` lánc, ha a head/body joint állapot is publikus contract lesz.
 3. `RobotState.velocity` publikus mező:
    - legalább commanded velocity és/vagy estimated base velocity külön jelölve.
-4. Safety schema kiegészítés:
-   - `min_body_height_m` és opcionális kontaktus/freshness limitek.
+4. Stability schema további bővítése:
+   - `min_body_height_m` implementálva a `SafetyConfig` és `RobotState.stability` részeként.
+   - Kontaktus/freshness okkódok a közös evaluatorban elérhetők; külön publikus konfigurációs endpoint vagy globális policy még nincs.
 5. Perception timestamp mezők:
    - frame timestamp, detection timestamp, follower control timestamp.
 
