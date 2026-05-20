@@ -132,3 +132,81 @@ class TestGeminiLiveToolExecution:
         assert result["speech"] == "Kész."
 
         controller.hermes.delegate.assert_awaited_once_with("fix schemas.py bug")
+
+
+class TestGeminiLiveAudioFixes:
+    """Verifies feedback prevention, mic gating, and interruption queue flushing."""
+
+    @pytest.mark.asyncio
+    async def test_interruption_flushes_queue(self, mock_env):
+        controller = GeminiLiveController()
+        controller.audio_output_queue.put_nowait(b"audio-1")
+        controller.audio_output_queue.put_nowait(b"audio-2")
+        controller.is_speaking = True
+        controller._last_speaker_time = 999.0
+
+        # Simulate receiving interrupted message
+        ws_mock = AsyncMock()
+        ws_mock.__aiter__.return_value = [
+            json.dumps({
+                "serverContent": {
+                    "interrupted": True
+                }
+            })
+        ]
+        controller._ws = ws_mock
+        controller._running = True
+
+        # Run receiver loop (will stop when iterator ends)
+        await controller._receive_loop()
+
+        # The queue must be completely empty
+        assert controller.audio_output_queue.empty()
+        assert controller.is_speaking is False
+        assert controller._last_speaker_time == 0.0
+
+    def test_play_audio_loop_updates_speaking_state(self, mock_env):
+        controller = GeminiLiveController()
+        controller._speaker_stream = MagicMock()
+        controller._playback_running = True
+        
+        # Put one chunk and then a None sentinel to break loop
+        controller.audio_output_queue.put_nowait(b"dummy-pcm-data")
+        controller.audio_output_queue.put_nowait(None)
+        
+        # Run play audio loop synchronously
+        controller._play_audio_loop()
+        
+        # Verify that it wrote to the stream and reset is_speaking to False on finish
+        controller._speaker_stream.write.assert_called_once_with(b"dummy-pcm-data")
+        assert controller.is_speaking is False
+
+    @pytest.mark.asyncio
+    async def test_mic_loop_sends_silence_when_speaking(self, mock_env):
+        import base64
+        controller = GeminiLiveController()
+        controller._ws = AsyncMock()
+        controller._running = True
+        controller.is_speaking = True # Active speaking state
+        
+        # Mock sounddevice raw input stream
+        with patch("sounddevice.RawInputStream"):
+            # Put raw data into input queue
+            test_pcm = b"\x01\x02\x03\x04"
+            await controller.audio_input_queue.put(test_pcm)
+            
+            # Start mic input loop and stop it immediately after processing
+            async def stop_after_one_chunk():
+                await asyncio.sleep(0.05)
+                controller._running = False
+                await controller.audio_input_queue.put(None)
+                
+            asyncio.create_task(stop_after_one_chunk())
+            await controller._mic_input_loop()
+            
+            # Verify that the sent data was zeroed out (muted)
+            controller._ws.send.assert_called()
+            sent_payload = json.loads(controller._ws.send.call_args[0][0])
+            sent_base64 = sent_payload["realtimeInput"]["mediaChunks"][0]["data"]
+            sent_bytes = base64.b64decode(sent_base64)
+            assert sent_bytes == b"\x00\x00\x00\x00"

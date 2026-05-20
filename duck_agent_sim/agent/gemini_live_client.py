@@ -75,6 +75,9 @@ class GeminiLiveController:
         self._speaker_stream = None
         self._device_index = None
 
+        self.is_speaking = False
+        self._last_speaker_time = 0.0
+
     def _resolve_api_key(self) -> str:
         """Resolves Google / Gemini API key from env or global ~/.hermes/.env file."""
         # 1. Check environment variables
@@ -191,22 +194,30 @@ class GeminiLiveController:
 
     def _play_audio_loop(self):
         """Dedicated background thread to play PCM chunks sequentially in strict FIFO order."""
+        import time
         logger.info("Speaker playback thread started.")
         while self._playback_running:
             try:
                 # Block with timeout to check self._playback_running
                 chunk = self.audio_output_queue.get(timeout=0.1)
             except queue.Empty:
+                self.is_speaking = False
                 continue
             if chunk is None:
+                self.is_speaking = False
                 break
+            
+            self.is_speaking = True
+            self._last_speaker_time = time.time()
             try:
                 if self._speaker_stream:
                     self._speaker_stream.write(chunk)
+                    self._last_speaker_time = time.time()
             except Exception as e:
                 logger.error(f"Error in speaker playback thread: {e}")
             finally:
                 self.audio_output_queue.task_done()
+        self.is_speaking = False
         logger.info("Speaker playback thread stopped.")
 
     async def run(self):
@@ -323,7 +334,14 @@ class GeminiLiveController:
         def callback(indata, frames, time_info, status):
             if status:
                 logger.warning(f"Mic status: {status}")
-            self.audio_input_queue.put_nowait(bytes(indata))
+            
+            import time
+            is_currently_speaking = self.is_speaking or (time.time() - self._last_speaker_time < 0.5)
+            if is_currently_speaking:
+                # Immediate microphone gate in callback to prevent acoustic echo feedback latency gaps
+                self.audio_input_queue.put_nowait(bytes(len(indata)))
+            else:
+                self.audio_input_queue.put_nowait(bytes(indata))
 
         try:
             logger.info("Initializing local microphone input stream (16kHz mono PCM16)...")
@@ -340,6 +358,13 @@ class GeminiLiveController:
                     if not self._running or not self._ws:
                         break
                     
+                    # Prevent acoustic feedback: if speaker is active, send silent audio chunks.
+                    # This prevents the server VAD from incorrectly cutting off the robot's own responses.
+                    import time
+                    is_currently_speaking = self.is_speaking or (time.time() - self._last_speaker_time < 0.5)
+                    if is_currently_speaking:
+                        data = bytes(len(data))
+
                     payload = {
                         "realtimeInput": {
                             "mediaChunks": [
@@ -410,9 +435,22 @@ class GeminiLiveController:
 
                 data = json.loads(message)
 
-                # 1. Parse Conversational audio output
+                # 1. Parse Conversational audio output and server interruption
                 server_content = data.get("serverContent") or data.get("server_content")
                 if server_content:
+                    # Check for server-side interruption (user spoke)
+                    if server_content.get("interrupted") or server_content.get("interrupted") is True:
+                        logger.info("Received server-side interruption signal from Gemini Live. Clearing playback queue.")
+                        # Clear all pending audio chunks in queue
+                        while not self.audio_output_queue.empty():
+                            try:
+                                self.audio_output_queue.get_nowait()
+                                self.audio_output_queue.task_done()
+                            except (queue.Empty, ValueError):
+                                break
+                        self.is_speaking = False
+                        self._last_speaker_time = 0.0
+
                     model_turn = server_content.get("modelTurn") or server_content.get("model_turn")
                     if model_turn:
                         parts = model_turn.get("parts") or []
@@ -422,6 +460,10 @@ class GeminiLiveController:
                                 raw_data = inline_data.get("data")
                                 if raw_data and self._speaker_stream:
                                     audio_bytes = base64.b64decode(raw_data)
+                                    # Set speaking state IMMEDIATELY upon queueing to lock microphone before playback thread starts
+                                    import time
+                                    self.is_speaking = True
+                                    self._last_speaker_time = time.time()
                                     self.audio_output_queue.put_nowait(audio_bytes)
 
                 # 2. Parse Tool Calls
