@@ -9,6 +9,7 @@ Kötelező vezérlési szabály: az agent kizárólag magas szintű Duck Agent B
 - Biztonságos vezérlési felület: `GET /state`, `POST /command`, `POST /stop`, `POST /reset`, illetve a `scripts/duck_bridge_tool.py` wrapper.
 - Ajánlott agent-eszköz: `python3 scripts/duck_bridge_tool.py ...`, mert preflight állapotellenőrzést végez, és instabil/fallen állapotban stop+reset helyreállítást indít.
 - Stabil állapot: `fallen=false`, `status` nem `fallen`, roll/pitch küszöb alatt, Z magasság nem esett össze, kontaktok a módnak és mozgásfázisnak megfelelőek.
+- A publikus `RobotState.stability` contract géppel olvasható formában publikálja a stabilitási státuszt (`stable`, `unstable`, `fallen`), okkódokat és a használt safety thresholdokat.
 - Ha a robot elesett vagy instabil: azonnal stop, majd reset; az eredetileg kért mozgást nem szabad ugyanabban a lépésben tovább erőltetni.
 
 ## Érintett fájlok és források
@@ -126,7 +127,65 @@ Javasolt agent interpretáció:
 - Mindkét láb kontaktvesztése + Z összeesés vagy roll/pitch küszöbátlépés: fallen/unstable.
 - Kontakt önmagában ne írja felül a hivatalos `fallen`, `status`, height, roll, pitch feltételeket; inkább diagnosztikai jelként kezeld.
 
-## 3. Stop + reset protokoll
+## 3. Publikus Stability API contract
+
+A `GET /state` válasz `RobotState` objektuma most tartalmaz egy `stability` mezőt is. Ez nem váltja ki a régi `fallen`, `status`, `position`, `orientation` és `feet_contact` mezőket; azok továbbra is stabil API részek. A `stability` mező ezekből készített, géppel olvasható összegzés.
+
+Példa stabil mock állapotra:
+
+```json
+{
+  "stability": {
+    "status": "stable",
+    "reasons": [],
+    "min_body_height_m": 0.15,
+    "internal_fallen_min_body_height_m": 0.15,
+    "agent_preflight_min_body_height_m": 0.25,
+    "freshness_sec": null,
+    "thresholds": {
+      "max_roll_deg": 35.0,
+      "max_pitch_deg": 35.0,
+      "min_body_height_m": 0.15,
+      "agent_preflight_min_body_height_m": 0.25,
+      "state_freshness_timeout_sec": null,
+      "require_feet_contact": false
+    }
+  }
+}
+```
+
+### `stability.status`
+
+- `stable`: nincs ismert stability/safety ok.
+- `unstable`: nem belső fallen, de agent preflight, kontakt vagy freshness guard sérül. Ilyenkor az agent ne indítson mozgást automatikusan.
+- `fallen`: a belső fallen safety feltételek valamelyike teljesül.
+
+### `stability.reasons` okkódok
+
+Belső fallen okok (`status="fallen"`):
+
+- `fallen_flag`: `RobotState.fallen == true`.
+- `fallen_status`: `RobotState.status == "fallen"`.
+- `roll_exceeds_max`: `abs(orientation.roll_deg) > thresholds.max_roll_deg`.
+- `pitch_exceeds_max`: `abs(orientation.pitch_deg) > thresholds.max_pitch_deg`.
+- `body_height_below_min`: `position[2] < thresholds.min_body_height_m`.
+
+Unstable / preflight okok (`status="unstable"`, ha nincs fallen ok):
+
+- `body_height_below_agent_preflight_min`: a robot a belső fallen magasság felett van, de az agent preflight guard alatt.
+- `no_feet_contact`: kontaktusértékelésnél egyik láb sem érintkezik.
+- `state_stale`: explicit freshness értékelésnél az állapot idősebb a megadott timeoutnál.
+
+### Publikált thresholdok
+
+- `thresholds.max_roll_deg`, `thresholds.max_pitch_deg`: a használt dőlésküszöbök.
+- `thresholds.min_body_height_m` és `min_body_height_m`: az effektív belső fallen magasságküszöb. Alapértelmezés: real `0.08 m`, mock/webcam `0.15 m`.
+- `thresholds.agent_preflight_min_body_height_m` és `agent_preflight_min_body_height_m`: a konzervatív agent guard. Alapértelmezés: real `0.10 m`, mock/webcam `0.25 m`.
+- `SafetyConfig.min_body_height_m`: opcionális parancs/safety override a belső fallen magasságküszöbre. Ha `null`, a mód szerinti alapérték érvényes.
+
+Fontos architekturális különbség: a belső fallen threshold (`min_body_height_m`) azt jelzi, mikor minősül a robot elesettnek a safety monitor szerint. Az agent preflight guard (`agent_preflight_min_body_height_m`) szigorúbb operátori korlát; alatta az agent már ne indítson mozgást, de ez önmagában még nem feltétlenül `fallen`.
+
+## 4. Stop + reset protokoll
 
 Minden mozgás vagy autonóm követés előtt állapotot kell olvasni. A preferált út:
 
@@ -166,7 +225,7 @@ Nem megengedett:
 - Nyers `qpos`, `qvel`, `data.ctrl`, joint angle vagy motor target kiadása vezérlésként.
 - A reset utáni instabil állapot figyelmen kívül hagyása.
 
-## 4. Real/sim mód különbségei
+## 5. Real/sim mód különbségei
 
 ### `DUCK_SIM_MODE=mock`
 
@@ -193,7 +252,7 @@ Nem megengedett:
 - Reset után is előfordulhat azonnali instabilitás; ilyen esetben stop+reset után sem szabad mozgást folytatni, amíg a diagnosztika nem tisztázta az okot.
 - macOS-on látható MuJoCo viewerhez `mjpython` szükséges; sima python/uvicorn viewer hibát okozhat.
 
-## 5. Contact és friction paraméterek
+## 6. Contact és friction paraméterek
 
 A flat terrain XML releváns beállításai:
 
@@ -208,7 +267,7 @@ Diagnosztikai jelentőség:
 - Túl nagy friction/contact damping esetén a policy vagy kinematikai rásegítés nehezen indítja meg a robotot.
 - Kontakt ellenőrzés névfüggő: real módban a kód `foot_assembly`, `foot_assembly_2` és `floor` body neveket keres. Néveltérés esetén a kontakt false lehet akkor is, ha vizuálisan érintkezés látszik.
 
-## 6. Ismert reset utáni instabilitási okok
+## 7. Ismert reset utáni instabilitási okok
 
 Lehetséges okok és diagnosztikai lépések:
 
@@ -243,7 +302,7 @@ Lehetséges okok és diagnosztikai lépések:
    - A `/vision/frame` lehetőleg a FrameBuffer legutóbbi frame-jét szolgálja ki.
    - Vision hiba nem robot fallen, de follow loopnál deadman/stop logika szükséges.
 
-## 7. Ajánlott operátori parancsok
+## 8. Ajánlott operátori parancsok
 
 Bridge állapot:
 
@@ -274,7 +333,7 @@ Teljes embodied snapshot:
 python3 scripts/duck_bridge_tool.py sense
 ```
 
-## 8. Ellenőrző checklist
+## 9. Ellenőrző checklist
 
 ### Preflight minden mozgás/follow/scenario előtt
 
@@ -305,7 +364,7 @@ python3 scripts/duck_bridge_tool.py sense
 - [ ] Nem történt nyers joint/motor/qpos/qvel/data.ctrl vezérlés.
 - [ ] Follow/scenario parancs után a follower/scenario állapot nem hagy mozgó instabil robotot.
 
-## 9. Döntési fa
+## 10. Döntési fa
 
 1. Kell mozgás vagy autonóm follow?
    - Igen: előbb state preflight.

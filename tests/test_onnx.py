@@ -1,41 +1,53 @@
+import importlib.util
 import os
+
 import numpy as np
 import pytest
-from duck_agent_sim.simulator.duck_sim import RealDuckSimulator
+
 from duck_agent_sim.config import DUCK_ONNX_MODEL_PATH
+from duck_agent_sim.simulator.policy_contract import (
+    OBSERVATION_SIZE,
+    POLICY_OUTPUT_SIZE,
+)
+
 
 def test_onnx_model_loading_and_shape():
-    # Verify the model path is correctly resolved
     assert DUCK_ONNX_MODEL_PATH != "", "Default DUCK_ONNX_MODEL_PATH should be configured"
     assert os.path.exists(DUCK_ONNX_MODEL_PATH), f"Model file must exist at {DUCK_ONNX_MODEL_PATH}"
 
-    # Initialize RealDuckSimulator in headless mode for automated unit tests
+    import onnxruntime as ort
+
+    session = ort.InferenceSession(DUCK_ONNX_MODEL_PATH, providers=["CPUExecutionProvider"])
+    input_meta = session.get_inputs()[0]
+    output_meta = session.get_outputs()[0]
+
+    assert input_meta.name == "obs"
+    assert input_meta.shape == [1, OBSERVATION_SIZE]
+    assert output_meta.name == "continuous_actions"
+    assert output_meta.shape == [1, POLICY_OUTPUT_SIZE]
+
+    action = session.run(None, {input_meta.name: np.zeros((1, OBSERVATION_SIZE), dtype=np.float32)})[0]
+    assert action.shape == (1, POLICY_OUTPUT_SIZE)
+    assert action.dtype == np.float32
+
+
+@pytest.mark.skipif(importlib.util.find_spec("mujoco") is None, reason="MuJoCo is optional in unit-test environments")
+def test_real_simulator_onnx_observation_shape_when_mujoco_available():
+    from duck_agent_sim.simulator.duck_sim import RealDuckSimulator
+
     sim = RealDuckSimulator(headless=True)
-    
-    # Trigger initialization (which loads the model)
     sim.reset()
-    
+
     try:
-        # Assert ONNX is active
         assert sim._onnx_active is True, "ONNX policy should be active in simulator"
         assert sim._onnx_session is not None, "ONNX InferenceSession should be initialized"
 
-        # Get observation vector
         obs = sim._get_onnx_obs()
-        
-        # Assert observation vector shape is 101 (based on 14 actuator DOFs)
-        assert len(obs) == 101, f"Observation vector must have exactly 101 elements, got {len(obs)}"
-        assert obs.dtype == np.float32, "Observation vector must be float32"
+        assert obs.shape == (OBSERVATION_SIZE,)
+        assert obs.dtype == np.float32
 
-        # Run inference step
         sim._apply_onnx_inference()
-        
-        # Verify action output size
-        assert len(sim.last_action) == sim.num_dofs, "Actions must match the number of actuators"
-        assert len(sim.motor_targets) == sim.num_dofs, "Motor targets must match the number of actuators"
-        
+        assert len(sim.last_action) == sim.num_dofs == POLICY_OUTPUT_SIZE
+        assert len(sim.motor_targets) == sim.num_dofs == POLICY_OUTPUT_SIZE
     finally:
-        # Stop simulation thread and cleanup
-        sim._running = False
-        if sim._thread:
-            sim._thread.join(timeout=1.0)
+        sim.close()

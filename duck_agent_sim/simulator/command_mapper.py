@@ -1,9 +1,14 @@
-from duck_agent_sim.schemas import RobotCommand, ControlIntent
+from duck_agent_sim.schemas import ControlIntent, RobotCommand
+from duck_agent_sim.simulator.policy_contract import clamp_control_to_policy_limits
+
 
 def map_command(cmd: RobotCommand) -> ControlIntent:
     """
-    Translates a high-level RobotCommand into a low-level ControlIntent (velocities/yaw rate).
-    Does not expose raw joints.
+    Translates a high-level RobotCommand into a conservative policy command.
+
+    The public API accepts normalized speed/turn values, but the ONNX walking
+    policy was deployed with a much narrower command distribution. Clamp the
+    mapped velocity/yaw command before it reaches the observation vector.
     """
     linear_x = 0.0
     linear_y = 0.0
@@ -40,8 +45,9 @@ def map_command(cmd: RobotCommand) -> ControlIntent:
         linear_y = 0.0
         yaw = 0.0
 
+    clamped = clamp_control_to_policy_limits(linear_x, linear_y, yaw)
     return ControlIntent(
-        linear_x=linear_x,
-        linear_y=linear_y,
-        yaw=yaw
+        linear_x=clamped.linear_x,
+        linear_y=clamped.linear_y,
+        yaw=clamped.yaw,
     )

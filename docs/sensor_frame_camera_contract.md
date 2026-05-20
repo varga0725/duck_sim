@@ -201,23 +201,49 @@ Az XML `xyaxes` jelentése: a kamera lokális X és Y tengelye van megadva. Itt:
 
 A camera világ-extrinsics a `head_assembly` aktuális pose-ától is függ; a fenti adatok a fejhez rögzített lokális extrinsics.
 
-### 5.3 Intrinsics
+### 5.3 Intrinsics és `GET /camera/info`
 
-Elérhető/deriválható intrinsics adatok:
+A publikus kamera contractot a `GET /camera/info` endpoint adja vissza. A válasz Pydantic sémája (`CameraInfoResponse`) minden módban tartalmazza:
 
-- render méret: `width=640`, `height=480`
-- vertikális látószög real MuJoCo `fpv` kameránál: `fovy=45.0°`
+- `mode`: `mock`, `real` vagy `webcam`
+- `width`, `height`: jelenleg minden aktív kameraútvonalon `640x480`
+- `fovy`: vertikális látószög fokban, ha ismert, különben `null`
+- `intrinsics`: `fx`, `fy`, `cx`, `cy`, ha levezethető, különben `null`
+- `distortion`: torzítási együtthatók, jelenleg `null`
+- `calibrated`: jelzi, hogy a kamera contract kalibrált/definiált-e
+- `camera_frame`: publikus kamera frame név
+- `extrinsics`: lokális kamera transform, ha ismert, különben `null`
 
-A kódban nincs explicit kamera-mátrix (`fx`, `fy`, `cx`, `cy`) vagy torzítási modell publikálva. Ha pinhole közelítést kell használni a MuJoCo real kamerára, a jelenlegi adatokból tipikusan származtatható:
+Real MuJoCo módban az endpoint a `fpv` kamera contractját publikálja:
 
-- `cy ≈ height / 2 = 240`
-- `cx ≈ width / 2 = 320`
-- `fy ≈ (height / 2) / tan(fovy / 2)`
-- `fx` az aspect ratio és feltételezett square pixels alapján számolható
+```json
+{
+  "mode": "real",
+  "width": 640,
+  "height": 480,
+  "fovy": 45.0,
+  "intrinsics": {"fx": 579.4112549695428, "fy": 579.4112549695428, "cx": 320.0, "cy": 240.0},
+  "distortion": null,
+  "calibrated": true,
+  "camera_frame": "fpv",
+  "extrinsics": {
+    "reference_frame": "head_assembly",
+    "translation_m": [0.08, 0.0, 0.05],
+    "quaternion_wxyz": [0.70710678, 0.0, -0.0, -0.70710678]
+  }
+}
+```
 
-Ez azonban nincs API-szerződésként rögzítve, ezért lásd a hiányzó adatok listáját.
+A pinhole intrinsics levezetése:
 
-Webcam módban az intrinsics és extrinsics nincsenek kalibrálva. A host kamera csak 640x480 RGB képforrásként szerepel; fizikai kamera pozíció/orientáció nincs szerződésben.
+- `cy = height / 2 = 240`
+- `cx = width / 2 = 320`
+- `fy = (height / 2) / tan(fovy / 2)`
+- `fx = fy` square-pixel feltételezéssel
+
+Mock módban az endpoint generált kamera contractot ad `mock_camera` frame névvel, `fovy=45.0`, levezetett pinhole intrinsics mezőkkel, `distortion=null`, `calibrated=true`, és identity extrinsics-szel a `mock_world` frame-hez képest.
+
+Webcam módban az endpoint explicit módon nem kalibráltnak jelöli a host kamerát: `calibrated=false`, `camera_frame="webcam"`, `fovy=null`, `intrinsics=null`, `distortion=null`, `extrinsics=null`. A host kamera csak 640x480 RGB képforrásként szerepel; fizikai kamera pozíció/orientáció nincs szerződésben.
 
 ## 6. Perception/follower telemetria és kapcsolata a magas szintű bridge API-val
 
@@ -367,38 +393,36 @@ Perception/follower indítás előtt plusz ellenőrzések:
 
 Az alábbi adatok részben elérhetők belsőleg vagy levezethetők, de jelenleg nincsenek stabil, publikus bridge API-szerződésként dokumentálva/publikálva:
 
-1. Kamera intrinsics teljes mátrixa:
-   - `fx`, `fy`, `cx`, `cy`, skew, distortion coefficients.
-   - Real MuJoCo módban `fovy=45°` és 640x480 felbontás ismert, de pinhole mátrix nincs explicit API-ban.
-2. Webcam intrinsics/extrinsics:
-   - nincs kalibrációs adat, torzítási modell vagy robothoz viszonyított transzform.
-3. Kamera extrinsics publikus endpointja:
-   - real MuJoCo XML-ből ismert a `fpv` lokális extrinsics a `head_assembly` bodyhoz képest, de nincs `/camera/info` vagy hasonló endpoint.
-4. Publikus IMU raw stream:
+1. Webcam intrinsics/extrinsics:
+   - nincs kalibrációs adat, torzítási modell vagy robothoz viszonyított transzform; a `/camera/info` ezt explicit `calibrated=false` és `null` intrinsics/extrinsics mezőkkel jelöli.
+2. Kamera torzítási modell:
+   - `distortion` mező már része a `/camera/info` contractnak, de jelenleg minden módban `null`, mert nincs kalibrált torzítási együttható.
+3. Publikus IMU raw stream:
    - `gyro`, `accelerometer`, `local_linvel`, `global_linvel`, `global_angvel`, `position`, `orientation` szenzorok léteznek MuJoCo-ban, de a REST API jelenleg nem adja vissza őket külön.
-5. Publikus foot position / foot velocity stream:
+4. Publikus foot position / foot velocity stream:
    - MuJoCo szenzorok léteznek (`left_foot_pos`, `right_foot_pos`, `*_global_linvel`), de a REST API csak `feet_contact` booleant publikál.
-6. Sebességmező a `RobotState`-ben:
+5. Sebességmező a `RobotState`-ben:
    - a feladatban szereplő `velocity` frame jelenleg csak belső `_ringbuffer` snapshotban létezik, nem publikus schema mező.
-7. Pontos safety height threshold API-szinten:
+6. Pontos safety height threshold API-szinten:
    - a parancs safety schema csak roll/pitch limitet tartalmaz; a helper és `is_fallen` logika külön z-height küszöböt is használhat, de ez nem része a `SafetyConfig` schema-nak.
-8. Frame névkonvenciók formális leírása:
+7. Frame névkonvenciók formális leírása:
    - a világframe tengelyirányai és a robot forward/lateral/up tengelyek nincsenek külön REP-szerű dokumentumban rögzítve.
-9. Szenzor covariance/noise modell:
+8. Szenzor covariance/noise modell:
    - a MuJoCo szenzorokhoz és perception detekciókhoz nincs publikált zajmodell vagy covariance.
-10. Time synchronization:
+9. Time synchronization:
    - nincs explicit timestamp minden camera frame-hez, detekcióhoz, follower parancshoz és robot state-hez közös clockkal; csak `sim_time`, `last_update_sec` és belső wall-clock alapú loopok vannak.
 
 ## 9. Javasolt API-bővítések a szerződés stabilizálására
 
-1. `GET /sensors/state` endpoint:
-   - IMU raw: gyro, accelerometer, local/global velocities, framequat.
-   - foot raw: foot positions, velocities, up/axis vectors.
-   - timestamp/sim_time.
-2. `GET /camera/info` endpoint:
-   - width, height, fovy, fx/fy/cx/cy, distortion, camera frame neve.
-   - real módban `fpv -> head_assembly -> base` transform.
-   - webcam módban kalibráció hiánya explicit `calibrated=false` mezővel.
+1. `GET /sensors/state` endpoint (implementálva):
+   - IMU raw: `gyro`, `accelerometer`, `local_linvel`, `global_linvel`, `global_angvel`, `position`, `orientation`, `upvector`, `forwardvector`.
+   - Foot raw: `left/right.position`, `left/right.velocity`, `left/right.axis` (`left_foot_upvector` / `right_foot_upvector` MuJoCo `framexaxis` forrásból).
+   - Közös időmezők: `sim_time` és wall-clock `timestamp`.
+   - `real` módban a MuJoCo `sensordata` mezőkből töltődik, ha az adott szenzor megtalálható.
+   - `mock` és `webcam` módban a nyers MuJoCo szenzorok nem valósak: `available=false`, az összes nyers érték `null`.
+2. Kamera kalibrációs források betöltése:
+   - opcionális valódi webcam intrinsics/extrinsics és torzítási együtthatók konfigurációból.
+   - real módban opcionális teljes `fpv -> head_assembly -> base` lánc, ha a head/body joint állapot is publikus contract lesz.
 3. `RobotState.velocity` publikus mező:
    - legalább commanded velocity és/vagy estimated base velocity külön jelölve.
 4. Safety schema kiegészítés:

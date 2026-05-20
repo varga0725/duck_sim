@@ -1,17 +1,19 @@
-from duck_agent_sim.schemas import RobotCommand, SafetyConfig
+from duck_agent_sim.schemas import RobotCommand
 from duck_agent_sim.simulator.command_mapper import map_command
+from duck_agent_sim.simulator.policy_contract import POLICY_COMMAND_LIMITS
+
 
 def test_walk_forward_mapping():
     cmd = RobotCommand(command="walk_forward", speed=0.5, turn=0.1)
     control = map_command(cmd)
-    assert control.linear_x == 0.5
+    assert control.linear_x == POLICY_COMMAND_LIMITS.linear_x[1]
     assert control.linear_y == 0.0
     assert control.yaw == 0.1
 
 def test_walk_backward_mapping():
     cmd = RobotCommand(command="walk_backward", speed=0.5, turn=-0.2)
     control = map_command(cmd)
-    assert control.linear_x == -0.3  # -speed * 0.6
+    assert control.linear_x == POLICY_COMMAND_LIMITS.linear_x[0]
     assert control.linear_y == 0.0
     assert control.yaw == -0.2
 

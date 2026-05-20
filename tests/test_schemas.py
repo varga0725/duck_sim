@@ -44,3 +44,12 @@ def test_robot_state_defaults():
     assert state.position == (0.0, 0.0, 0.41)
     assert state.orientation.roll_deg == 0.0
     assert state.fallen is False
+    assert state.stability.status == "stable"
+    assert state.stability.reasons == []
+    assert state.stability.min_body_height_m == 0.15
+
+
+def test_safety_config_accepts_public_min_body_height_override():
+    safety = SafetyConfig(min_body_height_m=0.2)
+
+    assert safety.min_body_height_m == 0.2

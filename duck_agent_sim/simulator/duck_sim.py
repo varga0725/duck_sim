@@ -25,10 +25,18 @@ from duck_agent_sim.schemas import (
     CommandResponse,
     Orientation,
     FeetContact,
-    SafetyConfig
+    SafetyConfig,
+    SensorsState,
+    SensorAvailability
 )
 from duck_agent_sim.simulator.command_mapper import map_command
-from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop
+from duck_agent_sim.simulator.policy_contract import (
+    DOF_VEL_SCALE,
+    apply_action_to_targets,
+    apply_target_rate_limit,
+    clamp_targets_to_ctrlrange,
+)
+from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
 from duck_agent_sim.config import DUCK_ONNX_MODEL_PATH
 
 
@@ -59,9 +67,30 @@ class DuckSimulator(ABC):
         pass
 
     @abstractmethod
+    def get_sensor_state(self) -> SensorsState:
+        """Retrieves raw sensor state with explicit availability/null markers."""
+        pass
+
+    @abstractmethod
     def step(self, control: ControlIntent, dt: float, safety: SafetyConfig) -> RobotState:
         """Steps the physics simulation forward by dt using raw controls."""
         pass
+def _vec(values, length: int):
+    """Convert MuJoCo/numpy numeric slices to JSON-friendly float tuples."""
+    return tuple(float(v) for v in values[:length])
+
+
+def _unavailable_sensor_state(mode: str, sim_time: float) -> SensorsState:
+    return SensorsState(
+        mode=mode,
+        sim_time=float(sim_time),
+        timestamp=time.time(),
+        imu=SensorAvailability(available=False),
+        feet={
+            "left": SensorAvailability(available=False),
+            "right": SensorAvailability(available=False),
+        },
+    )
 
 
 class MockDuckSimulator(DuckSimulator):
@@ -134,7 +163,14 @@ class MockDuckSimulator(DuckSimulator):
         return self.get_state()
 
     def get_state(self) -> RobotState:
-        return self._state.model_copy(deep=True)
+        from duck_agent_sim.config import DUCK_SIM_MODE
+
+        return with_stability(self._state.model_copy(deep=True), SafetyConfig(), DUCK_SIM_MODE)
+
+    def get_sensor_state(self) -> SensorsState:
+        from duck_agent_sim.config import DUCK_SIM_MODE
+
+        return _unavailable_sensor_state(DUCK_SIM_MODE, self._state.sim_time)
 
     def apply_command(self, command: RobotCommand) -> CommandResponse:
         # 1. Reset if requested
@@ -551,8 +587,8 @@ class RealDuckSimulator(DuckSimulator):
             right_contact = self.check_contact("foot_assembly_2", "floor")
             contacts = np.array([float(left_contact), float(right_contact)])
             
-            # Scale parameters from mujoco_infer.py
-            dof_vel_scale = 0.05
+            # Scale parameters from policy contract
+            dof_vel_scale = DOF_VEL_SCALE
             
             obs = np.concatenate([
                 gyro,
@@ -594,25 +630,22 @@ class RealDuckSimulator(DuckSimulator):
             action = outputs[0][0]  # awd=True format
             
             # 4. Filter & scale actions to motor targets
-            action_scale = 0.25
             self.last_last_last_action = self.last_last_action.copy()
             self.last_last_action = self.last_action.copy()
             self.last_action = action.copy()
             
-            self.motor_targets = self.default_actuator + action * action_scale
+            self.motor_targets = apply_action_to_targets(action)
             
-            # Apply motor speed limits if needed
+            # Apply motor speed limits after target ctrlrange clipping.
             USE_MOTOR_SPEED_LIMITS = True
-            max_motor_velocity = 5.24  # rad/s
-            sim_dt = 0.002
-            decimation = 10
-            
             if USE_MOTOR_SPEED_LIMITS:
-                self.motor_targets = np.clip(
+                self.motor_targets = apply_target_rate_limit(
                     self.motor_targets,
-                    self.prev_motor_targets - max_motor_velocity * (sim_dt * decimation),
-                    self.prev_motor_targets + max_motor_velocity * (sim_dt * decimation)
+                    self.prev_motor_targets,
                 )
+                self.prev_motor_targets = self.motor_targets.copy()
+            else:
+                self.motor_targets = clamp_targets_to_ctrlrange(self.motor_targets)
                 self.prev_motor_targets = self.motor_targets.copy()
                 
             # Apply control to MuJoCo
@@ -870,7 +903,60 @@ class RealDuckSimulator(DuckSimulator):
 
     def get_state(self) -> RobotState:
         self._initialize_mujoco()
-        return self._state.model_copy(deep=True)
+        from duck_agent_sim.config import DUCK_SIM_MODE
+
+        return with_stability(self._state.model_copy(deep=True), self._safety_config, DUCK_SIM_MODE)
+
+    def get_sensor_state(self) -> SensorsState:
+        self._initialize_mujoco()
+        from duck_agent_sim.config import DUCK_SIM_MODE
+        import mujoco
+
+        def read_sensor(name: str, dim: int):
+            sensor_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SENSOR, name)
+            if sensor_id < 0:
+                return None
+            addr = int(self.model.sensor_adr[sensor_id])
+            return _vec(self.data.sensordata[addr : addr + dim], dim)
+
+        with self._lock:
+            state = self._state.model_copy(deep=True)
+            imu_values = {
+                "gyro": read_sensor("gyro", 3),
+                "accelerometer": read_sensor("accelerometer", 3),
+                "local_linvel": read_sensor("local_linvel", 3),
+                "global_linvel": read_sensor("global_linvel", 3),
+                "global_angvel": read_sensor("global_angvel", 3),
+                "position": read_sensor("position", 3),
+                "orientation": read_sensor("orientation", 4),
+                "upvector": read_sensor("upvector", 3),
+                "forwardvector": read_sensor("forwardvector", 3),
+            }
+            left_values = {
+                "position": read_sensor("left_foot_pos", 3),
+                "velocity": read_sensor("left_foot_global_linvel", 3),
+                "axis": read_sensor("left_foot_upvector", 3),
+            }
+            right_values = {
+                "position": read_sensor("right_foot_pos", 3),
+                "velocity": read_sensor("right_foot_global_linvel", 3),
+                "axis": read_sensor("right_foot_upvector", 3),
+            }
+
+            imu_available = all(value is not None for value in imu_values.values())
+            left_available = all(value is not None for value in left_values.values())
+            right_available = all(value is not None for value in right_values.values())
+
+            return SensorsState(
+                mode=DUCK_SIM_MODE,
+                sim_time=state.sim_time,
+                timestamp=time.time(),
+                imu=SensorAvailability(available=imu_available, **imu_values),
+                feet={
+                    "left": SensorAvailability(available=left_available, **left_values),
+                    "right": SensorAvailability(available=right_available, **right_values),
+                },
+            )
 
     def apply_command(self, command: RobotCommand) -> CommandResponse:
         self._initialize_mujoco()
