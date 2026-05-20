@@ -131,6 +131,33 @@ def test_api_command_execution():
         # Since it walked forward, position x should have advanced
         assert data["state"]["position"][0] > 0.0
 
+
+def test_api_command_state_stability_uses_command_safety_thresholds():
+    response = client.get("/health")
+    if response.json()["sim_mode"] == "mock":
+        client.post("/reset")
+        payload = {
+            "command": "walk_forward",
+            "speed": 0.25,
+            "turn": 0.0,
+            "duration_sec": 0.1,
+            "safety": {
+                "stop_on_fall": True,
+                "max_pitch_deg": 20.0,
+                "max_roll_deg": 21.0,
+                "min_body_height_m": 0.2,
+            },
+        }
+
+        res = client.post("/command", json=payload)
+
+        assert res.status_code == 200
+        data = res.json()
+        assert data["state"]["stability"]["thresholds"]["max_pitch_deg"] == 20.0
+        assert data["state"]["stability"]["thresholds"]["max_roll_deg"] == 21.0
+        assert data["state"]["stability"]["min_body_height_m"] == 0.2
+
+
 def test_api_walk_square_scenario():
     response = client.get("/health")
     if response.json()["sim_mode"] == "mock":

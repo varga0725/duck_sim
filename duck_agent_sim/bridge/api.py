@@ -147,6 +147,7 @@ def post_command(cmd: RobotCommand):
 
         response = active_simulator.apply_command(cmd)
         post_assessment = _assess_bridge_state(response.state, cmd.safety)
+        assessed_state = response.state.model_copy(update={"stability": post_assessment})
         if post_assessment.status != "stable":
             recovered_state = _recover_from_unstable_state()
             return response.model_copy(update={
@@ -154,7 +155,7 @@ def post_command(cmd: RobotCommand):
                 "safety_intervention": "post_command_recovered",
                 "safety_reasons": post_assessment.reasons,
             })
-        return response
+        return response.model_copy(update={"state": assessed_state})
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e))
     except ValueError as e:
