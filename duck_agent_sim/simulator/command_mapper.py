@@ -31,7 +31,7 @@ def map_command(cmd: RobotCommand) -> ControlIntent:
     elif command_name == "turn_left":
         linear_x = speed * 0.2
         linear_y = 0.0
-        # Ensure we always rotate left, turn factor defaults to >= 0.4 if turn value is low
+        # Ensure we rotate left even when turn input is small.
         yaw = max(abs(turn), 0.4)
 
     elif command_name == "turn_right":
@@ -40,7 +40,7 @@ def map_command(cmd: RobotCommand) -> ControlIntent:
         # Ensure we always rotate right
         yaw = -max(abs(turn), 0.4)
 
-    elif command_name == "stop" or command_name == "reset" or command_name == "look_around":
+    elif command_name in {"stop", "reset", "look_around"}:
         linear_x = 0.0
         linear_y = 0.0
         yaw = 0.0

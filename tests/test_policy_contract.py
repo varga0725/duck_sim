@@ -59,7 +59,10 @@ EXPECTED_CTRL_RANGES = np.array(
 
 
 def test_onnx_policy_io_contract_matches_documented_shapes():
-    session = ort.InferenceSession(DUCK_ONNX_MODEL_PATH, providers=["CPUExecutionProvider"])
+    session = ort.InferenceSession(
+        DUCK_ONNX_MODEL_PATH,
+        providers=["CPUExecutionProvider"],
+    )
 
     inputs = session.get_inputs()
     outputs = session.get_outputs()
@@ -74,7 +77,10 @@ def test_onnx_policy_io_contract_matches_documented_shapes():
     assert outputs[0].shape == [1, POLICY_OUTPUT_SIZE]
     assert outputs[0].type == "tensor(float)"
 
-    action = session.run(None, {"obs": np.zeros((1, OBSERVATION_SIZE), dtype=np.float32)})[0]
+    action = session.run(
+        None,
+        {"obs": np.zeros((1, OBSERVATION_SIZE), dtype=np.float32)},
+    )[0]
     assert action.shape == (1, POLICY_OUTPUT_SIZE)
     assert action.dtype == np.float32
 
@@ -88,15 +94,25 @@ def test_actuator_order_and_ranges_match_documented_contract():
 
 
 def test_action_scale_maps_zero_and_small_actions_to_expected_targets():
-    zero_targets = apply_action_to_targets(np.zeros(POLICY_OUTPUT_SIZE, dtype=np.float32))
+    zero_targets = apply_action_to_targets(
+        np.zeros(POLICY_OUTPUT_SIZE, dtype=np.float32)
+    )
     safe_positive_action = np.full(POLICY_OUTPUT_SIZE, 0.1, dtype=np.float32)
     safe_negative_action = np.full(POLICY_OUTPUT_SIZE, -0.1, dtype=np.float32)
     positive_targets = apply_action_to_targets(safe_positive_action)
     negative_targets = apply_action_to_targets(safe_negative_action)
 
     np.testing.assert_allclose(zero_targets, DEFAULT_ACTUATOR, atol=1e-6)
-    np.testing.assert_allclose(positive_targets, DEFAULT_ACTUATOR + 0.1 * ACTION_SCALE, atol=1e-6)
-    np.testing.assert_allclose(negative_targets, DEFAULT_ACTUATOR - 0.1 * ACTION_SCALE, atol=1e-6)
+    np.testing.assert_allclose(
+        positive_targets,
+        DEFAULT_ACTUATOR + 0.1 * ACTION_SCALE,
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        negative_targets,
+        DEFAULT_ACTUATOR - 0.1 * ACTION_SCALE,
+        atol=1e-6,
+    )
 
 
 def test_action_targets_are_explicitly_clipped_to_actuator_ctrl_ranges():
@@ -115,8 +131,20 @@ def test_action_targets_are_explicitly_clipped_to_actuator_ctrl_ranges():
 @pytest.mark.parametrize(
     ("command", "speed", "turn", "expected_x", "expected_yaw"),
     [
-        ("walk_forward", 1.0, 1.0, POLICY_COMMAND_LIMITS.linear_x[1], POLICY_COMMAND_LIMITS.yaw[1]),
-        ("walk_backward", 1.0, -1.0, POLICY_COMMAND_LIMITS.linear_x[0], POLICY_COMMAND_LIMITS.yaw[0]),
+        (
+            "walk_forward",
+            1.0,
+            1.0,
+            POLICY_COMMAND_LIMITS.linear_x[1],
+            POLICY_COMMAND_LIMITS.yaw[1],
+        ),
+        (
+            "walk_backward",
+            1.0,
+            -1.0,
+            POLICY_COMMAND_LIMITS.linear_x[0],
+            POLICY_COMMAND_LIMITS.yaw[0],
+        ),
         ("turn_left", 1.0, 1.0, 0.15, POLICY_COMMAND_LIMITS.yaw[1]),
         ("turn_right", 1.0, 1.0, 0.15, POLICY_COMMAND_LIMITS.yaw[0]),
     ],
@@ -129,8 +157,16 @@ def test_bridge_command_mapping_is_conservatively_clamped_to_policy_range(
     assert control.linear_y == 0.0
     assert control.linear_x == pytest.approx(expected_x)
     assert control.yaw == pytest.approx(expected_yaw)
-    assert POLICY_COMMAND_LIMITS.linear_x[0] <= control.linear_x <= POLICY_COMMAND_LIMITS.linear_x[1]
-    assert POLICY_COMMAND_LIMITS.linear_y[0] <= control.linear_y <= POLICY_COMMAND_LIMITS.linear_y[1]
+    assert (
+        POLICY_COMMAND_LIMITS.linear_x[0]
+        <= control.linear_x
+        <= POLICY_COMMAND_LIMITS.linear_x[1]
+    )
+    assert (
+        POLICY_COMMAND_LIMITS.linear_y[0]
+        <= control.linear_y
+        <= POLICY_COMMAND_LIMITS.linear_y[1]
+    )
     assert POLICY_COMMAND_LIMITS.yaw[0] <= control.yaw <= POLICY_COMMAND_LIMITS.yaw[1]
 
 
@@ -146,7 +182,9 @@ def test_mujoco_actuator_ctrlrange_is_present_or_policy_targets_stay_clipped():
     # In minimal CI environments MuJoCo is optional; the bridge-level explicit clip
     # still guarantees ctrl values stay inside the documented ctrlrange.
     if importlib.util.find_spec("mujoco") is None:
-        targets = apply_action_to_targets(np.full(POLICY_OUTPUT_SIZE, 100.0, dtype=np.float32))
+        targets = apply_action_to_targets(
+            np.full(POLICY_OUTPUT_SIZE, 100.0, dtype=np.float32)
+        )
         assert np.all(targets <= ACTUATOR_CTRL_RANGES[:, 1])
         return
 
@@ -157,4 +195,8 @@ def test_mujoco_actuator_ctrlrange_is_present_or_policy_targets_stay_clipped():
     xml_text = base.epath.Path(FLAT_TERRAIN_XML).read_text()
     model = mujoco.MjModel.from_xml_string(xml_text, assets=base.get_assets())
     assert model.nu == POLICY_OUTPUT_SIZE
-    np.testing.assert_allclose(model.actuator_ctrlrange, ACTUATOR_CTRL_RANGES, atol=1e-6)
+    np.testing.assert_allclose(
+        model.actuator_ctrlrange,
+        ACTUATOR_CTRL_RANGES,
+        atol=1e-6,
+    )

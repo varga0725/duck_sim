@@ -22,6 +22,9 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
 
+from duck_agent_sim.schemas import FeetContact, Orientation, RobotState, SafetyConfig
+from duck_agent_sim.simulator.safety import evaluate_stability
+
 DEFAULT_BASE_URL = "http://127.0.0.1:8765"
 ALLOWED_COMMANDS = {
     "walk_forward",
@@ -112,31 +115,56 @@ def reset(base_url: str) -> Dict[str, Any]:
     return request_json(base_url, "POST", "/reset")
 
 
-def is_unstable(state: Dict[str, Any], max_pitch: float, max_roll: float, min_height: float) -> bool:
+def _state_from_payload(state: Dict[str, Any]) -> RobotState:
     orientation = state.get("orientation") or {}
-    position = state.get("position") or [0.0, 0.0, 0.0]
-    try:
-        z = float(position[2])
-    except Exception:
-        z = 0.0
-    roll = abs(float(orientation.get("roll_deg", 0.0)))
-    pitch = abs(float(orientation.get("pitch_deg", 0.0)))
-    return bool(
-        state.get("fallen")
-        or state.get("status") == "fallen"
-        or roll >= max_roll
-        or pitch >= max_pitch
-        or z < min_height
+    feet_contact = state.get("feet_contact") or {}
+    position = state.get("position") or (0.0, 0.0, 0.0)
+    return RobotState(
+        robot=state.get("robot", "open_duck_mini_v2"),
+        status=state.get("status", "idle"),
+        sim_time=float(state.get("sim_time", 0.0) or 0.0),
+        position=tuple(position) if len(position) >= 3 else (0.0, 0.0, 0.0),
+        orientation=Orientation(
+            roll_deg=float(orientation.get("roll_deg", 0.0) or 0.0),
+            pitch_deg=float(orientation.get("pitch_deg", 0.0) or 0.0),
+            yaw_deg=float(orientation.get("yaw_deg", 0.0) or 0.0),
+        ),
+        feet_contact=FeetContact(
+            left=bool(feet_contact.get("left", True)),
+            right=bool(feet_contact.get("right", True)),
+        ),
+        fallen=bool(state.get("fallen", False)),
+        last_command=state.get("last_command", "stop"),
     )
 
 
+def assess_unstable(state: Dict[str, Any], max_pitch: float, max_roll: float, min_height: float) -> Dict[str, Any]:
+    safety = SafetyConfig(max_pitch_deg=max_pitch, max_roll_deg=max_roll, min_body_height_m=min_height)
+    robot_state = _state_from_payload(state)
+    assessment = evaluate_stability(
+        robot_state,
+        safety=safety,
+        sim_mode="real" if min_height <= 0.10 else "mock",
+        use_agent_preflight_guard=True,
+        require_feet_contact=True,
+    )
+    return assessment.model_dump()
+
+
+def is_unstable(state: Dict[str, Any], max_pitch: float, max_roll: float, min_height: float) -> bool:
+    return assess_unstable(state, max_pitch=max_pitch, max_roll=max_roll, min_height=min_height)["status"] != "stable"
+
+
 def recover_if_unstable(base_url: str, state: Dict[str, Any], max_pitch: float, max_roll: float, min_height: float) -> Optional[Dict[str, Any]]:
-    if not is_unstable(state, max_pitch=max_pitch, max_roll=max_roll, min_height=min_height):
+    assessment = assess_unstable(state, max_pitch=max_pitch, max_roll=max_roll, min_height=min_height)
+    if assessment["status"] == "stable":
         return None
     stop_result = stop(base_url)
     reset_result = reset(base_url)
     return {
         "safety_intervention": "unstable_or_fallen_detected",
+        "safety_status": assessment["status"],
+        "safety_reasons": assessment["reasons"],
         "state_before_recovery": state,
         "stop_result": stop_result,
         "reset_result": reset_result,

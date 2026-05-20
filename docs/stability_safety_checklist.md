@@ -15,13 +15,14 @@ Kapcsolódó dokumentum: `docs/stability_safety_rules.md`
 - [ ] Munkakönyvtár: `/Users/vargaferenc/Desktop/duck_sim`.
 - [ ] Bridge health ellenőrizve: `python3 scripts/duck_bridge_tool.py health`.
 - [ ] Robot state ellenőrizve: `python3 scripts/duck_bridge_tool.py state`.
+- [ ] `state.stability.status == "stable"`, vagy ha nem stabil, a `state.stability.reasons` oklistát kezelem és nem indítok mozgást.
 - [ ] `fallen == false`.
 - [ ] `status != "fallen"`.
 - [ ] `abs(roll_deg) < 35.0`.
 - [ ] `abs(pitch_deg) < 35.0`.
 - [ ] Z magasság megfelelő:
-  - [ ] mock/webcam agent preflight: `position[2] >= 0.25`
-  - [ ] real agent preflight: `position[2] >= 0.10`
+  - [ ] mock/webcam belső fallen threshold: `state.stability.min_body_height_m == 0.15`, agent preflight: `state.stability.agent_preflight_min_body_height_m == 0.25`
+  - [ ] real belső fallen threshold: `state.stability.min_body_height_m == 0.08`, agent preflight: `state.stability.agent_preflight_min_body_height_m == 0.10`
 - [ ] Kontaktok nem jeleznek nyilvánvaló összeesést.
 - [ ] `safety.stop_on_fall == true`.
 - [ ] A tervezett parancs a megengedett listából való: `walk_forward`, `walk_backward`, `turn_left`, `turn_right`, `stop`, `reset`, `look_around`.

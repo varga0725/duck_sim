@@ -114,7 +114,10 @@ def apply_action_to_targets(action: np.ndarray) -> np.ndarray:
     return clamp_targets_to_ctrlrange(raw_targets)
 
 
-def apply_target_rate_limit(targets: np.ndarray, previous_targets: np.ndarray) -> np.ndarray:
+def apply_target_rate_limit(
+    targets: np.ndarray,
+    previous_targets: np.ndarray,
+) -> np.ndarray:
     target_array = clamp_targets_to_ctrlrange(targets)
     previous_array = clamp_targets_to_ctrlrange(previous_targets)
     limited = np.clip(

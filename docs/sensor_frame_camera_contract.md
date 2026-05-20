@@ -403,9 +403,11 @@ Az alábbi adatok részben elérhetők belsőleg vagy levezethetők, de jelenleg
    - MuJoCo szenzorok léteznek (`left_foot_pos`, `right_foot_pos`, `*_global_linvel`), de a REST API csak `feet_contact` booleant publikál.
 5. Sebességmező a `RobotState`-ben:
    - a feladatban szereplő `velocity` frame jelenleg csak belső `_ringbuffer` snapshotban létezik, nem publikus schema mező.
-6. Pontos safety height threshold API-szinten:
-   - a parancs safety schema csak roll/pitch limitet tartalmaz; a helper és `is_fallen` logika külön z-height küszöböt is használhat, de ez nem része a `SafetyConfig` schema-nak.
-7. Frame névkonvenciók formális leírása:
+7. Pontos safety height threshold API-szinten:
+   - Megoldva a stability contract részeként: `RobotState.stability.min_body_height_m`, `RobotState.stability.internal_fallen_min_body_height_m`, `RobotState.stability.agent_preflight_min_body_height_m`, valamint `RobotState.stability.thresholds.*` publikálja az effektív küszöböket.
+   - `SafetyConfig.min_body_height_m` opcionális belső fallen magasságküszöb override.
+   - A belső fallen threshold és az agent preflight guard külön mezők, mert eltérő safety jelentésük van.
+
    - a világframe tengelyirányai és a robot forward/lateral/up tengelyek nincsenek külön REP-szerű dokumentumban rögzítve.
 8. Szenzor covariance/noise modell:
    - a MuJoCo szenzorokhoz és perception detekciókhoz nincs publikált zajmodell vagy covariance.
