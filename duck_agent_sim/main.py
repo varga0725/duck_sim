@@ -25,18 +25,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"Listen Port: {BRIDGE_PORT}")
     logger.info("=========================================")
     
-    # Eagerly initialize/reset the simulator on startup to verify dependencies and load ONNX policies early
-    from duck_agent_sim.simulator.instance import active_simulator
-    logger.info("Eagerly initializing simulator and loading RL policies...")
-    active_simulator.get_state()
+    from duck_agent_sim.services import app_context
+    logger.info("Eagerly initializing AppContext and active simulator services...")
+    app_context.start()
     
     yield
     # Shutdown Sequence
     logger.info("Stopping Duck Agent Simulation Bridge API...")
-    from duck_agent_sim.simulator.instance import active_simulator
-    if hasattr(active_simulator, "close"):
-        logger.info("Closing active simulator background thread/viewer...")
-        active_simulator.close()
+    from duck_agent_sim.services import app_context
+    app_context.shutdown()
 
 # Initialize FastAPI
 app = FastAPI(

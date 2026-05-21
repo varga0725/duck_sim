@@ -4,7 +4,12 @@ from duck_agent_sim.bridge import api
 from duck_agent_sim.main import app
 from duck_agent_sim.schemas import FeetContact, Orientation, RobotState
 
-client = TestClient(app)
+import pytest
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
 class SpySimulator:
@@ -54,7 +59,7 @@ def unstable_state(**overrides):
     return RobotState(**data)
 
 
-def test_command_preflight_recovers_and_does_not_execute_requested_motion(monkeypatch):
+def test_command_preflight_recovers_and_does_not_execute_requested_motion(client, monkeypatch):
     sim = SpySimulator([unstable_state(status="fallen", fallen=True)])
     monkeypatch.setattr(api, "active_simulator", sim)
 
@@ -72,7 +77,7 @@ def test_command_preflight_recovers_and_does_not_execute_requested_motion(monkey
     assert sim.apply_command_calls == []
 
 
-def test_command_post_check_recovers_if_motion_destabilizes(monkeypatch):
+def test_command_post_check_recovers_if_motion_destabilizes(client, monkeypatch):
     class DestabilizingSimulator(SpySimulator):
         def apply_command(self, cmd):
             self.apply_command_calls.append(cmd)
@@ -106,7 +111,7 @@ def test_command_post_check_recovers_if_motion_destabilizes(monkeypatch):
     assert len(sim.apply_command_calls) == 1
 
 
-def test_walk_square_preflight_uses_same_recovery_and_skips_scenario(monkeypatch):
+def test_walk_square_preflight_uses_same_recovery_and_skips_scenario(client, monkeypatch):
     sim = SpySimulator([unstable_state(position=(0.0, 0.0, 0.05), fallen=False, status="idle")])
     monkeypatch.setattr(api, "active_simulator", sim)
 
@@ -123,7 +128,7 @@ def test_walk_square_preflight_uses_same_recovery_and_skips_scenario(monkeypatch
     assert sim.apply_command_calls == []
 
 
-def test_follow_start_preflight_recovers_and_does_not_start_follower(monkeypatch):
+def test_follow_start_preflight_recovers_and_does_not_start_follower(client, monkeypatch):
     sim = SpySimulator([
         unstable_state(
             status="idle",

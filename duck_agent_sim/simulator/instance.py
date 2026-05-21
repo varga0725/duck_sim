@@ -1,8 +1,6 @@
-from duck_agent_sim.config import DUCK_SIM_MODE
-from duck_agent_sim.simulator.duck_sim import MockDuckSimulator, RealDuckSimulator
+from duck_agent_sim.services import SimulatorProxy
 
-# Instantiate singleton simulator based on the configuration
-if DUCK_SIM_MODE == "real":
-    active_simulator = RealDuckSimulator()
-else:
-    active_simulator = MockDuckSimulator()
+# Dynamic transparent proxy representing the active simulator singleton.
+# The real instance is lifecycle-managed and injected via AppContext/ServiceRegistry.
+active_simulator = SimulatorProxy()
+

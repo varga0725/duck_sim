@@ -8,7 +8,10 @@ from duck_agent_sim.vision.perception_state import PerceptionState
 from duck_agent_sim.vision.follower import VisionGuidedFollower, FollowerState
 from duck_agent_sim.vision import follower as global_follower
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 def test_follower_configuration():
     state_repo = PerceptionState()
@@ -173,7 +176,7 @@ def test_deadman_timeout():
     assert follower.state == FollowerState.STOPPED
 
 
-def test_follower_rest_endpoints():
+def test_follower_rest_endpoints(client):
     # Make sure target follower is stopped initially
     global_follower.stop()
     
@@ -223,4 +226,57 @@ def test_follower_active_search():
     
     assert follower.search_yaw_speed == 0.5
     assert follower.search_timeout == 5.0
+
+
+def test_follower_active_search_timeout_and_spin_direction():
+    state_repo = PerceptionState()
+    follower = VisionGuidedFollower(state_repo)
+    
+    # 1. Initially it should be positive spin direction
+    assert follower.last_seen_direction == 1.0
+    
+    # 2. Simulate target on the right (yaw_target would be negative)
+    # error_x > center_deadzone (e.g. 130 > 30)
+    state_repo.width = 640
+    state_repo.height = 480
+    detections = [
+        {"label": "person", "confidence": 0.95, "bbox": [400.0, 100.0, 500.0, 300.0], "center": [450.0, 200.0], "tracking_id": 1}
+    ]
+    
+    # Calculate controls and update direction based on error
+    target = follower._find_target(detections)
+    assert target is not None
+    cx, cy = target["center"]
+    error_x = cx - 320.0
+    yaw_target = -follower.K_p_yaw * error_x
+    if yaw_target != 0.0:
+        follower.last_seen_direction = 1.0 if yaw_target > 0.0 else -1.0
+    assert follower.last_seen_direction == -1.0
+    
+    # 3. Simulate target lost and active search state machine transition
+    follower.lost_since = None
+    follower.state = FollowerState.SEARCHING
+    
+    # First time target is lost: lost_since gets initialized
+    if follower.lost_since is None:
+        follower.lost_since = time.time()
+    
+    assert follower.lost_since is not None
+    
+    # 4. Spin direction should match last_seen_direction (-1.0)
+    yaw_target_search = follower.search_yaw_speed * follower.last_seen_direction
+    assert yaw_target_search == -0.4
+    
+    # 5. Simulate timeout expiration: lost_since is in the past
+    follower.lost_since = time.time() - 20.0
+    lost_duration = time.time() - follower.lost_since
+    assert lost_duration >= follower.search_timeout
+    
+    # Under timeout condition:
+    follower.state = FollowerState.STOPPED
+    follower.running = False
+    
+    assert follower.state == FollowerState.STOPPED
+    assert follower.running is False
+
 

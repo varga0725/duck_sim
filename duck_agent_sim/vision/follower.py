@@ -9,6 +9,17 @@ from duck_agent_sim.vision.perception_state import PerceptionState
 
 logger = logging.getLogger("duck-agent-sim-follower")
 
+
+def _publish_follower_stop() -> None:
+    from duck_agent_sim.simulator.instance import active_simulator
+
+    active_simulator.set_desired_control(
+        ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0),
+        SafetyConfig(),
+        command="vision_follow_stop",
+        duration_sec=0.2,
+    )
+
 class FollowerState(str, Enum):
     SEARCHING = "SEARCHING"
     TRACKING = "TRACKING"
@@ -39,6 +50,7 @@ class VisionGuidedFollower:
         self.last_target_box_height = 0.0
         self.active_target_id = -1
         self.lost_since: Optional[float] = None
+        self.last_seen_direction = 1.0  # 1.0 for left/positive, -1.0 for right/negative
         
         # Configuration parameters
         self.target_label = "person"
@@ -115,10 +127,9 @@ class VisionGuidedFollower:
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=1.0)
             
-        # Command active simulator to explicitly stop
+        # Publish a zero desired control without stepping physics directly.
         try:
-            from duck_agent_sim.simulator.instance import active_simulator
-            active_simulator.stop()
+            _publish_follower_stop()
         except Exception as e:
             logger.error(f"Failed to issue simulator stop command during follower shutdown: {e}")
         logger.info("Vision-guided follower loop thread stopped.")
@@ -201,6 +212,10 @@ class VisionGuidedFollower:
                         yaw_target = -self.K_p_yaw * self.error_x
                         yaw_target = max(-self.max_yaw, min(self.max_yaw, yaw_target))
                         
+                        # Save last seen direction based on yaw_target sign to guide active searching
+                        if yaw_target != 0.0:
+                            self.last_seen_direction = 1.0 if yaw_target > 0.0 else -1.0
+                        
                         # Slowdown linear speed during aggressive turns to prioritize centering
                         if abs(self.error_x) > 2 * self.center_deadzone:
                             linear_x_target *= 0.4
@@ -217,16 +232,17 @@ class VisionGuidedFollower:
                         
                     lost_duration = time.time() - self.lost_since
                     if lost_duration >= self.search_timeout:
+                        logger.warning(f"Search timeout of {self.search_timeout}s reached. Stopping follower and terminating thread.")
                         self.state = FollowerState.STOPPED
                         linear_x_target = 0.0
                         yaw_target = 0.0
-                        # Command simulator stop explicitly
-                        active_simulator.stop()
+                        self.running = False  # Terminate background thread loop so it can be cleanly restarted
+                        _publish_follower_stop()
                     else:
-                        # Active searching: spin on the spot
+                        # Active searching: spin on the spot in the direction last seen
                         self.state = FollowerState.SEARCHING
                         linear_x_target = 0.0
-                        yaw_target = self.search_yaw_speed
+                        yaw_target = self.search_yaw_speed * self.last_seen_direction
                         
                 # 3. Apply low-pass exponential smoothing filter to Turn Rate
                 yaw_smoothed = self.yaw_smooth_alpha * prev_yaw + (1.0 - self.yaw_smooth_alpha) * yaw_target
@@ -236,14 +252,20 @@ class VisionGuidedFollower:
                     self.current_linear_x = linear_x_target
                     self.current_yaw = yaw_smoothed
                     
-                # 4. Command execution on Simulator (step) if active
+                # 4. Publish desired control. The simulator-owned timing loop
+                # advances physics; follower must not call step().
                 if self.state != FollowerState.STOPPED:
                     control = ControlIntent(
                         linear_x=self.current_linear_x,
                         linear_y=0.0,
                         yaw=self.current_yaw
                     )
-                    active_simulator.step(control, dt=dt, safety=SafetyConfig())
+                    active_simulator.set_desired_control(
+                        control,
+                        SafetyConfig(),
+                        command="vision_follow",
+                        duration_sec=dt * 1.5,
+                    )
                     
             except Exception as e:
                 logger.error(f"Error in follower control loop: {e}", exc_info=True)

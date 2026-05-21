@@ -5,11 +5,16 @@ import os
 import collections
 import threading
 import logging
+import asyncio
 from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
+
+from duck_agent_sim.simulator.double_buffered_state import DoubleBufferedState
+from duck_agent_sim.simulator.control_plane import DesiredMotionState, ZERO_CONTROL, command_duration
+from duck_agent_sim.simulator.timing import SimulationClock
 
 logger = logging.getLogger("duck-agent-sim")
 
@@ -38,6 +43,15 @@ from duck_agent_sim.simulator.policy_contract import (
 )
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
 from duck_agent_sim.config import DUCK_ONNX_MODEL_PATH
+
+
+
+class DummyLock:
+    """A dummy lock implementation that does not block, preventing asyncio deadlocks."""
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
 
 class DuckSimulator(ABC):
@@ -102,11 +116,28 @@ class MockDuckSimulator(DuckSimulator):
     def __init__(self):
         try:
             import duck_agent_sim.simulator.instance as inst
-            inst.active_simulator = self
+            if hasattr(inst, "active_simulator") and hasattr(inst.active_simulator, "set_instance"):
+                inst.active_simulator.set_instance(self)
+            else:
+                inst.active_simulator = self
         except Exception:
             pass
         self._state = RobotState()
+        self._double_buffered_state = DoubleBufferedState(self._state)
+        self._command_exec_lock = DummyLock()
+        self._intent_lock = threading.RLock()
+        self._desired_motion = DesiredMotionState(
+            command="stop",
+            control=ZERO_CONTROL,
+            safety=SafetyConfig(),
+            started_at=time.monotonic(),
+            expires_at=None,
+        )
+        self._running = True
+        self._clock = SimulationClock("mock-physics", fixed_dt_sec=0.05)
+        self._thread = threading.Thread(target=self._simulation_loop, daemon=True, name="MockDuckSimulationLoop")
         self.reset()
+        self._thread.start()
         
         # Start background vision loop
         from duck_agent_sim.vision.camera import CameraDevice
@@ -132,6 +163,9 @@ class MockDuckSimulator(DuckSimulator):
 
     def close(self):
         """Stops background threads and releases resources."""
+        self._running = False
+        if hasattr(self, "_thread") and self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=1.0)
         from duck_agent_sim.vision import follower
         if follower is not None:
             follower.stop()
@@ -141,6 +175,14 @@ class MockDuckSimulator(DuckSimulator):
             self.camera_device.close()
 
     def reset(self) -> RobotState:
+        with self._intent_lock:
+            self._desired_motion = DesiredMotionState(
+                command="reset",
+                control=ZERO_CONTROL,
+                safety=SafetyConfig(),
+                started_at=time.monotonic(),
+                expires_at=None,
+            )
         self._state = RobotState(
             robot="open_duck_mini_v2",
             status="idle",
@@ -151,91 +193,308 @@ class MockDuckSimulator(DuckSimulator):
             fallen=False,
             last_command="reset"
         )
+        self._double_buffered_state.update_write_state(self._state)
+        self._double_buffered_state.swap()
         return self.get_state()
 
     def stop(self) -> RobotState:
+        with self._intent_lock:
+            self._desired_motion = DesiredMotionState(
+                command="stop",
+                control=ZERO_CONTROL,
+                safety=SafetyConfig(),
+                started_at=time.monotonic(),
+                expires_at=None,
+            )
         self._state.status = "stopped"
         self._state.last_command = "stop"
         # Zero out any waddling
         self._state.orientation.roll_deg = 0.0
         self._state.orientation.pitch_deg = 0.0
         self._state.feet_contact = FeetContact(left=True, right=True)
+        self._double_buffered_state.update_write_state(self._state)
+        self._double_buffered_state.swap()
         return self.get_state()
 
-    def get_state(self) -> RobotState:
-        from duck_agent_sim.config import DUCK_SIM_MODE
+    def get_clock_telemetry(self):
+        return self._clock.telemetry()
 
-        return with_stability(self._state.model_copy(deep=True), SafetyConfig(), DUCK_SIM_MODE)
+    def set_desired_control(
+        self,
+        control: ControlIntent,
+        safety: Optional[SafetyConfig] = None,
+        *,
+        command: str = "external_control",
+        duration_sec: Optional[float] = None,
+        request_id: Optional[str] = None,
+    ) -> RobotState:
+        now = time.monotonic()
+        expires_at = now + duration_sec if duration_sec is not None else None
+        with self._intent_lock:
+            self._desired_motion = DesiredMotionState(
+                command=command,
+                control=control.model_copy(deep=True),
+                safety=safety or SafetyConfig(),
+                started_at=now,
+                expires_at=expires_at,
+                request_id=request_id,
+            )
+            self._state.last_command = command
+        return self.get_state()
 
-    def get_sensor_state(self) -> SensorsState:
-        from duck_agent_sim.config import DUCK_SIM_MODE
-
-        return _unavailable_sensor_state(DUCK_SIM_MODE, self._state.sim_time)
-
-    def apply_command(self, command: RobotCommand) -> CommandResponse:
-        # 1. Reset if requested
+    async def execute_command_async(
+        self,
+        command: RobotCommand,
+        *,
+        request_id: Optional[str] = None,
+        cancel_event: Optional[asyncio.Event] = None,
+    ) -> CommandResponse:
         if command.command == "reset":
-            self.reset()
+            state = self.reset()
             control = map_command(command)
-            return CommandResponse(
-                accepted=True,
-                command=command.command,
-                mapped_control=control,
-                state=self.get_state()
-            )
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=state)
 
-        # 2. Check if already fallen
-        if self._state.fallen:
-            control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
-            self._state.status = "fallen"
-            return CommandResponse(
-                accepted=False,
-                command=command.command,
-                mapped_control=control,
-                state=self.get_state()
-            )
+        if command.command == "stop":
+            state = self.stop()
+            control = map_command(command)
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=state)
 
-        # 3. Map high-level command to low-level controls
+        if self.get_state().fallen:
+            control = ZERO_CONTROL
+            self.stop()
+            return CommandResponse(accepted=False, command=command.command, mapped_control=control, state=self.get_state())
+
         control = map_command(command)
-        self._state.last_command = command.command
+        duration = command_duration(command)
+        self.set_desired_control(
+            control,
+            command.safety,
+            command=command.command,
+            duration_sec=duration,
+            request_id=request_id,
+        )
 
-        # 4. Check for catastrophic fall condition based on extreme speed & duration parameters
-        if command.speed > 0.8 and command.duration_sec > 5.0:
-            # High speed and long duration causes it to trip
-            self._state.fallen = True
-            self._state.status = "fallen"
-            # Tip the orientation severely
-            self._state.orientation.pitch_deg = 48.0
-            self._state.orientation.roll_deg = 20.0
-            self._state.position = (self._state.position[0], self._state.position[1], 0.10)
-            self._state.feet_contact = FeetContact(left=False, right=False)
-            return CommandResponse(
-                accepted=True,
-                command=command.command,
-                mapped_control=control,
-                state=self.get_state()
-            )
-
-        # 5. Run simulation stepping for command.duration_sec in steps of 0.05s (dt)
-        dt = 0.05
-        elapsed = 0.0
-        target_duration = command.duration_sec
-
-        while elapsed < target_duration:
-            # If a fall occurs mid-step, break immediately
-            if self._state.fallen:
+        deadline = time.monotonic() + duration
+        while time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.is_set():
+                self.stop()
+                raise asyncio.CancelledError()
+            if self.get_state().fallen:
                 break
-            self.step(control, dt, command.safety)
-            elapsed += dt
+            await asyncio.sleep(0.01)
+
+        if self.get_state().fallen and command.safety.stop_on_fall:
+            self.stop()
 
         return CommandResponse(
             accepted=True,
             command=command.command,
             mapped_control=control,
-            state=self.get_state()
+            state=self.get_state(),
         )
 
+    def _simulation_loop(self) -> None:
+        self._clock.reset()
+        while self._running:
+            dt = self._clock.sleep_until_next_tick()
+            with self._intent_lock:
+                desired = self._desired_motion
+                if desired.expired:
+                    desired = DesiredMotionState(
+                        command="stop",
+                        control=ZERO_CONTROL,
+                        safety=SafetyConfig(),
+                        started_at=time.monotonic(),
+                        expires_at=None,
+                        request_id=desired.request_id,
+                    )
+                    self._desired_motion = desired
+            self._advance_from_intent(desired.control, dt, desired.safety)
+
+    def get_state(self) -> RobotState:
+        from duck_agent_sim.config import DUCK_SIM_MODE
+        state = self._double_buffered_state.get_read_state()
+        return with_stability(state, SafetyConfig(), DUCK_SIM_MODE)
+
+    def get_sensor_state(self) -> SensorsState:
+        from duck_agent_sim.config import DUCK_SIM_MODE
+        state = self._double_buffered_state.get_read_state()
+        return _unavailable_sensor_state(DUCK_SIM_MODE, state.sim_time)
+
+    def apply_command(self, command: RobotCommand) -> CommandResponse:
+        if command.command in ("reset", "stop"):
+            control = map_command(command)
+            state = self.reset() if command.command == "reset" else self.stop()
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=state)
+
+        control = map_command(command)
+        if self.get_state().fallen:
+            self.stop()
+            return CommandResponse(accepted=False, command=command.command, mapped_control=ZERO_CONTROL, state=self.get_state())
+
+        if command.speed > 0.8 and command.duration_sec > 5.0:
+            self._state.fallen = True
+            self._state.status = "fallen"
+            self._state.orientation.pitch_deg = 48.0
+            self._state.orientation.roll_deg = 20.0
+            self._state.position = (self._state.position[0], self._state.position[1], 0.10)
+            self._state.feet_contact = FeetContact(left=False, right=False)
+            self._double_buffered_state.update_write_state(self._state)
+            self._double_buffered_state.swap()
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=self.get_state())
+
+        self.set_desired_control(control, command.safety, command=command.command, duration_sec=command.duration_sec)
+        deadline = time.monotonic() + command.duration_sec
+        while time.monotonic() < deadline:
+            if self.get_state().fallen:
+                break
+            time.sleep(0.01)
+        if self.get_state().fallen and command.safety.stop_on_fall:
+            self.stop()
+        return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=self.get_state())
+
+    def _legacy_apply_command(self, command: RobotCommand) -> CommandResponse:
+        with self._command_exec_lock:
+            # 1. Reset if requested
+            if command.command == "reset":
+                self.reset()
+                control = map_command(command)
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 2. Check if already fallen
+            if self._state.fallen:
+                control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
+                self._state.status = "fallen"
+                return CommandResponse(
+                    accepted=False,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 3. Map high-level command to low-level controls
+            control = map_command(command)
+            self._state.last_command = command.command
+
+            # 4. Check for catastrophic fall condition based on extreme speed & duration parameters
+            if command.speed > 0.8 and command.duration_sec > 5.0:
+                # High speed and long duration causes it to trip
+                self._state.fallen = True
+                self._state.status = "fallen"
+                # Tip the orientation severely
+                self._state.orientation.pitch_deg = 48.0
+                self._state.orientation.roll_deg = 20.0
+                self._state.position = (self._state.position[0], self._state.position[1], 0.10)
+                self._state.feet_contact = FeetContact(left=False, right=False)
+                self._double_buffered_state.update_write_state(self._state)
+                self._double_buffered_state.swap()
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 5. Run simulation stepping for command.duration_sec in steps of 0.05s (dt)
+            dt = 0.05
+            elapsed = 0.0
+            target_duration = command.duration_sec
+
+            while elapsed < target_duration:
+                # If a fall occurs mid-step, break immediately
+                if self._state.fallen:
+                    break
+                self.set_desired_control(control, command.safety, command=command.command, duration_sec=dt)
+                time.sleep(dt)
+                elapsed += dt
+
+            return CommandResponse(
+                accepted=True,
+                command=command.command,
+                mapped_control=control,
+                state=self.get_state()
+            )
+
+    async def apply_command_async(self, command: RobotCommand) -> CommandResponse:
+        return await self.execute_command_async(command)
+
+    async def _legacy_apply_command_async(self, command: RobotCommand) -> CommandResponse:
+        with self._command_exec_lock:
+            # 1. Reset if requested
+            if command.command == "reset":
+                self.reset()
+                control = map_command(command)
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 2. Check if already fallen
+            if self._state.fallen:
+                control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
+                self._state.status = "fallen"
+                return CommandResponse(
+                    accepted=False,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 3. Map high-level command to low-level controls
+            control = map_command(command)
+            self._state.last_command = command.command
+
+            # 4. Check for catastrophic fall condition based on extreme speed & duration parameters
+            if command.speed > 0.8 and command.duration_sec > 5.0:
+                # High speed and long duration causes it to trip
+                self._state.fallen = True
+                self._state.status = "fallen"
+                # Tip the orientation severely
+                self._state.orientation.pitch_deg = 48.0
+                self._state.orientation.roll_deg = 20.0
+                self._state.position = (self._state.position[0], self._state.position[1], 0.10)
+                self._state.feet_contact = FeetContact(left=False, right=False)
+                self._double_buffered_state.update_write_state(self._state)
+                self._double_buffered_state.swap()
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 5. Run simulation stepping for command.duration_sec in steps of 0.05s (dt)
+            dt = 0.05
+            elapsed = 0.0
+            target_duration = command.duration_sec
+
+            while elapsed < target_duration:
+                # If a fall occurs mid-step, break immediately
+                if self._state.fallen:
+                    break
+                self.set_desired_control(control, command.safety, command=command.command, duration_sec=dt)
+                await asyncio.sleep(dt)
+                elapsed += dt
+
+            return CommandResponse(
+                accepted=True,
+                command=command.command,
+                mapped_control=control,
+                state=self.get_state()
+            )
+
     def step(self, control: ControlIntent, dt: float, safety: SafetyConfig) -> RobotState:
+        self.set_desired_control(control, safety, command="external_control", duration_sec=dt)
+        return self.get_state()
+
+    def _advance_from_intent(self, control: ControlIntent, dt: float, safety: SafetyConfig) -> RobotState:
         # If already fallen, safety limits movement
         if self._state.fallen:
             self._state.status = "fallen"
@@ -306,7 +565,9 @@ class MockDuckSimulator(DuckSimulator):
                 self._state.position = (pos_x, pos_y, 0.12)
                 self._state.feet_contact = FeetContact(left=False, right=False)
 
-        return self._state
+        self._double_buffered_state.update_write_state(self._state)
+        self._double_buffered_state.swap()
+        return self.get_state()
 
     def force_tilt(self, roll: float, pitch: float, z_height: float = 0.41):
         """Helper to inject simulated imbalance for testing safety layers."""
@@ -319,6 +580,8 @@ class MockDuckSimulator(DuckSimulator):
             self._state.fallen = True
             self._state.status = "fallen"
             self._state.feet_contact = FeetContact(left=False, right=False)
+        self._double_buffered_state.update_write_state(self._state)
+        self._double_buffered_state.swap()
 
 
 class RealDuckSimulator(DuckSimulator):
@@ -332,12 +595,15 @@ class RealDuckSimulator(DuckSimulator):
     def __init__(self, headless: bool = False):
         self.headless = headless or (os.getenv("DUCK_HEADLESS", "false").lower() == "true")
         self._lock = threading.RLock()
+        self._command_exec_lock = DummyLock()
         self._state = RobotState()
+        self._double_buffered_state = DoubleBufferedState(self._state)
         self._initialized = False
         self._running = False
         self._thread = None
         self._viewer = None
         self._kinematic_yaw = 0.0
+        self._clock = SimulationClock("real-physics", fixed_dt_sec=0.002)
         
         # ONNX Control state variables
         self._onnx_active = False
@@ -367,7 +633,10 @@ class RealDuckSimulator(DuckSimulator):
 
         try:
             import duck_agent_sim.simulator.instance as inst
-            inst.active_simulator = self
+            if hasattr(inst, "active_simulator") and hasattr(inst.active_simulator, "set_instance"):
+                inst.active_simulator.set_instance(self)
+            else:
+                inst.active_simulator = self
         except Exception:
             pass
 
@@ -511,7 +780,7 @@ class RealDuckSimulator(DuckSimulator):
             except Exception as e:
                 logger.warning(f"Failed to launch passive viewer: {e}")
 
-        step_start = time.time()
+        self._clock.reset()
         counter = 0
 
         while self._running:
@@ -551,11 +820,7 @@ class RealDuckSimulator(DuckSimulator):
 
             counter += 1
 
-            # Pacing: sleep to maintain real-time 500Hz stepping
-            elapsed_sim_time = self.model.opt.timestep
-            elapsed_real_time = time.time() - step_start
-            time.sleep(max(0, elapsed_sim_time - elapsed_real_time))
-            step_start = time.time()
+            self._clock.sleep_until_next_tick()
 
         # Shutdown sequence
         if viewer is not None:
@@ -802,6 +1067,8 @@ class RealDuckSimulator(DuckSimulator):
 
             # Update thread-safe reference
             self._state = new_state
+            self._double_buffered_state.update_write_state(new_state)
+            self._double_buffered_state.swap()
 
             # 6. Add debug snapshot to Ringbuffer
             snapshot = {
@@ -909,7 +1176,8 @@ class RealDuckSimulator(DuckSimulator):
         self._initialize_mujoco()
         from duck_agent_sim.config import DUCK_SIM_MODE
 
-        return with_stability(self._state.model_copy(deep=True), self._safety_config, DUCK_SIM_MODE)
+        state = self._double_buffered_state.get_read_state()
+        return with_stability(state, self._safety_config, DUCK_SIM_MODE)
 
     def get_sensor_state(self) -> SensorsState:
         self._initialize_mujoco()
@@ -962,13 +1230,127 @@ class RealDuckSimulator(DuckSimulator):
                 },
             )
 
+    def get_clock_telemetry(self):
+        return self._clock.telemetry()
+
+    def set_desired_control(
+        self,
+        control: ControlIntent,
+        safety: Optional[SafetyConfig] = None,
+        *,
+        command: str = "external_control",
+        duration_sec: Optional[float] = None,
+        request_id: Optional[str] = None,
+    ) -> RobotState:
+        self._initialize_mujoco()
+        with self._lock:
+            self._target_linear_x = control.linear_x
+            self._target_linear_y = control.linear_y
+            self._target_yaw_rate = control.yaw
+            self._last_command = command
+            self._last_command_time = time.time()
+            self._safety_config = safety or SafetyConfig()
+        return self.get_state()
+
+    async def execute_command_async(
+        self,
+        command: RobotCommand,
+        *,
+        request_id: Optional[str] = None,
+        cancel_event: Optional[asyncio.Event] = None,
+    ) -> CommandResponse:
+        self._initialize_mujoco()
+        if command.command == "reset":
+            state = self.reset()
+            control = map_command(command)
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=state)
+
+        if command.command == "stop":
+            state = self.stop()
+            control = map_command(command)
+            return CommandResponse(accepted=True, command=command.command, mapped_control=control, state=state)
+
+        if self.get_state().fallen:
+            self.stop()
+            return CommandResponse(accepted=False, command=command.command, mapped_control=ZERO_CONTROL, state=self.get_state())
+
+        control = map_command(command)
+        self.set_desired_control(
+            control,
+            command.safety,
+            command=command.command,
+            duration_sec=command_duration(command),
+            request_id=request_id,
+        )
+        deadline = time.monotonic() + command_duration(command)
+        while time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.is_set():
+                self.stop()
+                raise asyncio.CancelledError()
+            if self.get_state().fallen:
+                break
+            await asyncio.sleep(0.01)
+
+        if self.get_state().fallen and command.safety.stop_on_fall:
+            self.stop()
+
+        return CommandResponse(
+            accepted=True,
+            command=command.command,
+            mapped_control=control,
+            state=self.get_state(),
+        )
+
     def apply_command(self, command: RobotCommand) -> CommandResponse:
         self._initialize_mujoco()
+        with self._command_exec_lock:
+            # 1. Reset if requested
+            if command.command == "reset":
+                self.reset()
+                control = map_command(command)
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
 
-        # 1. Reset if requested
-        if command.command == "reset":
-            self.reset()
+            # 2. Check if already fallen
+            if self._state.fallen:
+                control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
+                self._target_linear_x = 0.0
+                self._target_linear_y = 0.0
+                self._target_yaw_rate = 0.0
+                return CommandResponse(
+                    accepted=False,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 3. Map command to controls and update targets
             control = map_command(command)
+            self._target_linear_x = control.linear_x
+            self._target_linear_y = control.linear_y
+            self._target_yaw_rate = control.yaw
+            self._last_command = command.command
+            self._last_command_time = time.time()
+
+            # 4. Wait for duration of command, checking if it falls mid-step
+            elapsed = 0.0
+            dt = 0.05
+            while elapsed < command.duration_sec:
+                if self._state.fallen:
+                    break
+                time.sleep(dt)
+                elapsed += dt
+
+            # If safety requires stop on fall, we do it
+            if self._state.fallen and command.safety.stop_on_fall:
+                self._target_linear_x = 0.0
+                self._target_linear_y = 0.0
+                self._target_yaw_rate = 0.0
+
             return CommandResponse(
                 accepted=True,
                 command=command.command,
@@ -976,48 +1358,62 @@ class RealDuckSimulator(DuckSimulator):
                 state=self.get_state()
             )
 
-        # 2. Check if already fallen
-        if self._state.fallen:
-            control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
-            self._target_linear_x = 0.0
-            self._target_linear_y = 0.0
-            self._target_yaw_rate = 0.0
+    async def apply_command_async(self, command: RobotCommand) -> CommandResponse:
+        self._initialize_mujoco()
+        with self._command_exec_lock:
+            # 1. Reset if requested
+            if command.command == "reset":
+                self.reset()
+                control = map_command(command)
+                return CommandResponse(
+                    accepted=True,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 2. Check if already fallen
+            if self._state.fallen:
+                control = ControlIntent(linear_x=0.0, linear_y=0.0, yaw=0.0)
+                self._target_linear_x = 0.0
+                self._target_linear_y = 0.0
+                self._target_yaw_rate = 0.0
+                return CommandResponse(
+                    accepted=False,
+                    command=command.command,
+                    mapped_control=control,
+                    state=self.get_state()
+                )
+
+            # 3. Map command to controls and update targets
+            control = map_command(command)
+            self._target_linear_x = control.linear_x
+            self._target_linear_y = control.linear_y
+            self._target_yaw_rate = control.yaw
+            self._last_command = command.command
+            self._last_command_time = time.time()
+
+            # 4. Wait for duration of command, checking if it falls mid-step
+            elapsed = 0.0
+            dt = 0.05
+            while elapsed < command.duration_sec:
+                if self._state.fallen:
+                    break
+                await asyncio.sleep(dt)
+                elapsed += dt
+
+            # If safety requires stop on fall, we do it
+            if self._state.fallen and command.safety.stop_on_fall:
+                self._target_linear_x = 0.0
+                self._target_linear_y = 0.0
+                self._target_yaw_rate = 0.0
+
             return CommandResponse(
-                accepted=False,
+                accepted=True,
                 command=command.command,
                 mapped_control=control,
                 state=self.get_state()
             )
-
-        # 3. Map command to controls and update targets
-        control = map_command(command)
-        self._target_linear_x = control.linear_x
-        self._target_linear_y = control.linear_y
-        self._target_yaw_rate = control.yaw
-        self._last_command = command.command
-        self._last_command_time = time.time()
-
-        # 4. Wait for duration of command, checking if it falls mid-step
-        elapsed = 0.0
-        dt = 0.05
-        while elapsed < command.duration_sec:
-            if self._state.fallen:
-                break
-            time.sleep(dt)
-            elapsed += dt
-
-        # If safety requires stop on fall, we do it
-        if self._state.fallen and command.safety.stop_on_fall:
-            self._target_linear_x = 0.0
-            self._target_linear_y = 0.0
-            self._target_yaw_rate = 0.0
-
-        return CommandResponse(
-            accepted=True,
-            command=command.command,
-            mapped_control=control,
-            state=self.get_state()
-        )
 
     def step(self, control: ControlIntent, dt: float, safety: SafetyConfig) -> RobotState:
         self._initialize_mujoco()
@@ -1026,8 +1422,6 @@ class RealDuckSimulator(DuckSimulator):
         self._target_yaw_rate = control.yaw
         self._last_command_time = time.time()
 
-        # Sleep to emulate synchronous physics stepping timing
-        time.sleep(dt)
         return self.get_state()
 
     def close(self):

@@ -25,6 +25,48 @@ from duck_agent_sim.config import DUCK_SIM_MODE
 router = APIRouter()
 
 
+def _context_queue_for_active_simulator():
+    try:
+        from duck_agent_sim.services import app_context
+
+        queue_manager = app_context.registry.get("queue_manager")
+        simulator = app_context.registry.get("simulator")
+    except Exception:
+        return None
+
+    if active_simulator is simulator:
+        return queue_manager
+
+    wrapped = getattr(active_simulator, "_wrapped", None)
+    if wrapped is simulator:
+        return queue_manager
+
+    return None
+
+
+async def _submit_robot_command(cmd: RobotCommand) -> CommandResponse:
+    queue_manager = _context_queue_for_active_simulator()
+    if queue_manager is not None:
+        return await queue_manager.submit_command(cmd)
+    return active_simulator.apply_command(cmd)
+
+
+async def _submit_stop() -> RobotState:
+    queue_manager = _context_queue_for_active_simulator()
+    if queue_manager is not None:
+        response = await queue_manager.submit_command(RobotCommand(command="stop"))
+        return response.state
+    return active_simulator.stop()
+
+
+async def _submit_reset() -> RobotState:
+    queue_manager = _context_queue_for_active_simulator()
+    if queue_manager is not None:
+        response = await queue_manager.submit_command(RobotCommand(command="reset"))
+        return response.state
+    return active_simulator.reset()
+
+
 def _assess_bridge_state(state: RobotState, safety: SafetyConfig):
     """Run the unified conservative safety assessment used by all high-level starts."""
     return evaluate_stability(
@@ -36,17 +78,18 @@ def _assess_bridge_state(state: RobotState, safety: SafetyConfig):
     )
 
 
-def _recover_from_unstable_state() -> RobotState:
+async def _recover_from_unstable_state() -> RobotState:
     """High-level recovery: stop, then reset. Never executes the original motion in this call."""
-    active_simulator.stop()
-    return active_simulator.reset()
+    await _submit_stop()
+    return await _submit_reset()
 
 
-def _preflight_recovery(safety: SafetyConfig):
+async def _preflight_recovery(safety: SafetyConfig):
     assessment = _assess_bridge_state(active_simulator.get_state(), safety)
     if assessment.status == "stable":
         return assessment, None
-    return assessment, _recover_from_unstable_state()
+    recovered = await _recover_from_unstable_state()
+    return assessment, recovered
 
 
 def _command_response_for_preflight_recovery(cmd: RobotCommand, assessment, recovered_state: RobotState) -> CommandResponse:
@@ -134,22 +177,22 @@ def get_camera_info():
 
 
 @router.post("/command", response_model=CommandResponse)
-def post_command(cmd: RobotCommand):
+async def post_command(cmd: RobotCommand):
     """
     Accepts a high-level motion command after a mandatory unified safety preflight.
     Unstable preflight triggers stop+reset and the requested command is not executed.
     Post-command instability also triggers stop+reset recovery before returning.
     """
     try:
-        assessment, recovered_state = _preflight_recovery(cmd.safety)
+        assessment, recovered_state = await _preflight_recovery(cmd.safety)
         if recovered_state is not None:
             return _command_response_for_preflight_recovery(cmd, assessment, recovered_state)
 
-        response = active_simulator.apply_command(cmd)
+        response = await _submit_robot_command(cmd)
         post_assessment = _assess_bridge_state(response.state, cmd.safety)
         assessed_state = response.state.model_copy(update={"stability": post_assessment})
         if post_assessment.status != "stable":
-            recovered_state = _recover_from_unstable_state()
+            recovered_state = await _recover_from_unstable_state()
             return response.model_copy(update={
                 "state": recovered_state,
                 "safety_intervention": "post_command_recovered",
@@ -164,36 +207,34 @@ def post_command(cmd: RobotCommand):
         raise HTTPException(status_code=500, detail=f"Internal simulator error: {str(e)}")
 
 @router.get("/state", response_model=RobotState)
-def get_state():
+async def get_state():
     """Returns the current state of the robot simulation (XYZ, RPY, feet contacts, fallen status)."""
     return active_simulator.get_state()
 
 @router.get("/sensors/state", response_model=SensorsState)
-def get_sensors_state():
+async def get_sensors_state():
     """Returns raw simulator sensor channels with explicit availability/null markers."""
     return active_simulator.get_sensor_state()
 
 @router.post("/stop")
-def post_stop():
+async def post_stop():
     """Immediately halts robot motion and resets waddling cycles."""
-    state = active_simulator.stop()
-    return {"stopped": True, "state": state}
+    return {"stopped": True, "state": await _submit_stop()}
 
 @router.post("/reset")
-def post_reset():
+async def post_reset():
     """Resets the robot to the initial stable coordinate and clears fallen/instability states."""
-    state = active_simulator.reset()
-    return {"reset": True, "state": state}
+    return {"reset": True, "state": await _submit_reset()}
 
 @router.post("/scenario/walk-square", response_model=ScenarioResponse)
-def post_walk_square():
+async def post_walk_square():
     """
     Executes a pre-scripted 4-sided square walking route.
     The same safety preflight runs before the scenario and before every step;
     any unstable state triggers stop+reset and aborts the remaining route.
     """
     safety = SafetyConfig()
-    assessment, recovered_state = _preflight_recovery(safety)
+    assessment, recovered_state = await _preflight_recovery(safety)
     if recovered_state is not None:
         return ScenarioResponse(
             scenario="walk_square",
@@ -220,7 +261,7 @@ def post_walk_square():
     safety_reasons = []
 
     for step in steps:
-        step_assessment, recovered_state = _preflight_recovery(safety)
+        step_assessment, recovered_state = await _preflight_recovery(safety)
         if recovered_state is not None:
             success = False
             safety_intervention = "preflight_recovered"
@@ -236,11 +277,11 @@ def post_walk_square():
         )
 
         try:
-            response = active_simulator.apply_command(cmd)
+            response = await _submit_robot_command(cmd)
             state = response.state
             post_assessment = _assess_bridge_state(state, safety)
             if post_assessment.status != "stable":
-                state = _recover_from_unstable_state()
+                state = await _recover_from_unstable_state()
                 success = False
                 safety_intervention = "post_command_recovered"
                 safety_reasons = post_assessment.reasons
@@ -328,13 +369,13 @@ def get_vision_state():
     return perception_state.get_summary()
 
 @router.post("/vision/follow/start")
-def post_follow_start(config: Optional[FollowerConfigSchema] = None):
+async def post_follow_start(config: Optional[FollowerConfigSchema] = None):
     """
     Starts the vision-guided target follower after the same mandatory safety preflight.
     Unstable preflight triggers stop+reset and the follower is not started.
     """
     safety = SafetyConfig()
-    assessment, recovered_state = _preflight_recovery(safety)
+    assessment, recovered_state = await _preflight_recovery(safety)
     if recovered_state is not None:
         return {
             "status": "blocked_by_safety",
@@ -365,4 +406,3 @@ def get_follow_status():
     Returns the telemetry and control loop status of the target follower.
     """
     return follower.get_status()
-

@@ -5,7 +5,12 @@ from duck_agent_sim.main import app
 from duck_agent_sim.schemas import SensorAvailability, SensorsState
 
 
-client = TestClient(app)
+import pytest
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
 def test_sensors_state_schema_marks_unavailable_values_as_null():
@@ -31,7 +36,7 @@ def test_sensors_state_schema_marks_unavailable_values_as_null():
     assert data["feet"]["right"]["velocity"] is None
 
 
-def test_get_sensors_state_mock_or_webcam_returns_explicit_unavailable_raw_sensor_contract():
+def test_get_sensors_state_mock_or_webcam_returns_explicit_unavailable_raw_sensor_contract(client):
     response = client.get("/sensors/state")
 
     assert response.status_code == 200
@@ -65,7 +70,7 @@ def test_get_sensors_state_mock_or_webcam_returns_explicit_unavailable_raw_senso
             assert data["feet"][foot]["upvector"] is None
 
 
-def test_get_sensors_state_real_contract_shape_when_available():
+def test_get_sensors_state_real_contract_shape_when_available(client):
     response = client.get("/sensors/state")
 
     assert response.status_code == 200

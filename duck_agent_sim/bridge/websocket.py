@@ -42,10 +42,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 if "command" in payload:
                     cmd = RobotCommand(**payload)
                     # Apply the command in the active simulator
-                    # Since apply_command executes blocking steps in mock mode,
-                    # we run it in an executor or simple loop
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, active_simulator.apply_command, cmd)
+                    from duck_agent_sim.services import app_context
+                    queue_manager = app_context.registry.get("queue_manager")
+                    await queue_manager.submit_command(cmd)
                     
                     # Send acknowledgement
                     await websocket.send_text(json.dumps({
