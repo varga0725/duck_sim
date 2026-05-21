@@ -45,13 +45,22 @@ class CameraDevice:
         return rgb_frame
 
     def close(self):
-        """Releases webcam resources if they were initialized."""
+        """Releases native camera/rendering resources if they were initialized."""
+        if self._renderer is not None:
+            try:
+                self._renderer.close()
+            except Exception:
+                pass
+            finally:
+                self._renderer = None
+
         if self._webcam_cap is not None:
             try:
                 self._webcam_cap.release()
-                self._webcam_cap = None
             except Exception:
                 pass
+            finally:
+                self._webcam_cap = None
 
     def _capture_real_frame(self) -> np.ndarray:
         import mujoco
