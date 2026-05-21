@@ -15,6 +15,7 @@ import numpy as np
 from duck_agent_sim.simulator.double_buffered_state import DoubleBufferedState
 from duck_agent_sim.simulator.control_plane import DesiredMotionState, ZERO_CONTROL, command_duration
 from duck_agent_sim.simulator.timing import SimulationClock
+from duck_agent_sim.simulator.legacy_dynamics import LegacyDynamicsController
 
 logger = logging.getLogger("duck-agent-sim")
 
@@ -42,7 +43,7 @@ from duck_agent_sim.simulator.policy_contract import (
     clamp_targets_to_ctrlrange,
 )
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
-from duck_agent_sim.config import DUCK_ONNX_MODEL_PATH
+from duck_agent_sim.config import DUCK_DYNAMICS_MODE, DUCK_ONNX_MODEL_PATH
 
 
 
@@ -604,6 +605,8 @@ class RealDuckSimulator(DuckSimulator):
         self._viewer = None
         self._kinematic_yaw = 0.0
         self._clock = SimulationClock("real-physics", fixed_dt_sec=0.002)
+        self._dynamics_mode = DUCK_DYNAMICS_MODE
+        self._legacy_dynamics = LegacyDynamicsController(mode=self._dynamics_mode)
         
         # ONNX Control state variables
         self._onnx_active = False
@@ -921,55 +924,12 @@ class RealDuckSimulator(DuckSimulator):
 
     def _stabilize_torso(self):
         with self._lock:
-            # 1. Integrate kinematic yaw at 500Hz control step (0.002s)
-            self._kinematic_yaw += self._current_yaw_rate * 0.002
-            yaw_rad = self._kinematic_yaw
+            # Phase 2A: all modes preserve legacy behavior; hybrid/dynamic only label
+            # diagnostics until their behavior is separately approved.
+            self._legacy_dynamics.apply(self)
 
-            # 2. Extract current roll, pitch, yaw
-            qw, qx, qy, qz = self.data.qpos[3:7]
-            roll, pitch, yaw = self.quaternion_to_euler(qw, qx, qy, qz)
-
-            # Enforce active physical limits on torso roll and pitch to prevent falling
-            max_roll_allow = 6.0   # degrees
-            max_pitch_allow = 4.0  # degrees
-            roll_stabilized = max(-max_roll_allow, min(max_roll_allow, roll))
-            pitch_stabilized = max(-max_pitch_allow, min(max_pitch_allow, pitch))
-
-            # Convert back to quaternion using stabilized roll/pitch and perfect kinematic yaw
-            roll_rad = math.radians(roll_stabilized)
-            pitch_rad = math.radians(pitch_stabilized)
-
-            cr = math.cos(roll_rad / 2.0)
-            sr = math.sin(roll_rad / 2.0)
-            cp = math.cos(pitch_rad / 2.0)
-            sp = math.sin(pitch_rad / 2.0)
-            cy = math.cos(yaw_rad / 2.0)
-            sy = math.sin(yaw_rad / 2.0)
-
-            self.data.qpos[3] = cr * cp * cy + sr * sp * sy  # qw
-            self.data.qpos[4] = sr * cp * cy - cr * sp * sy  # qx
-            self.data.qpos[5] = cr * sp * cy + sr * cp * sy  # qy
-            self.data.qpos[6] = cr * cp * sy - sr * sp * cy  # qz
-
-            # 3. Lock Z altitude directly to prevent vertical collapsing or sinking
-            self.data.qpos[2] = 0.15
-            self.data.qvel[2] = 0.0
-
-            # 4. Enforce base linear velocity mapping from commands directly
-            global_vx = self._current_linear_x * math.cos(yaw_rad) - self._current_linear_y * math.sin(yaw_rad)
-            global_vy = self._current_linear_x * math.sin(yaw_rad) + self._current_linear_y * math.cos(yaw_rad)
-
-            self.data.qvel[0] = global_vx
-            self.data.qvel[1] = global_vy
-
-            # Direct 500Hz position integration to bypass feet contact friction sticking/slipping
-            self.data.qpos[0] += global_vx * 0.002
-            self.data.qpos[1] += global_vy * 0.002
-
-            # 5. Enforce base angular rates (damp roll/pitch completely, enforce yaw command)
-            self.data.qvel[3] = 0.0
-            self.data.qvel[4] = 0.0
-            self.data.qvel[5] = self._current_yaw_rate
+    def get_dynamics_diagnostics(self):
+        return self._legacy_dynamics.snapshot()
 
     def _apply_waddle_oscillator(self):
         home_ctrl = self.model.keyframe("home").ctrl
@@ -1078,7 +1038,8 @@ class RealDuckSimulator(DuckSimulator):
                 "velocity": (self._current_linear_x, self._current_linear_y, self._current_yaw_rate),
                 "feet_contact": (left_contact, right_contact),
                 "fallen": new_state.fallen,
-                "command": self._last_command
+                "command": self._last_command,
+                "dynamics": self.get_dynamics_diagnostics()
             }
             self._ringbuffer.append(snapshot)
 

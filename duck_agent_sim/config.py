@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 from dotenv import load_dotenv
 
 # Load .env file if present
@@ -8,6 +9,19 @@ load_dotenv()
 DUCK_SIM_MODE = os.getenv("DUCK_SIM_MODE", "mock").lower()
 if DUCK_SIM_MODE not in ("mock", "real", "webcam"):
     DUCK_SIM_MODE = "mock"
+
+DynamicsMode = Literal["legacy", "hybrid", "dynamic"]
+
+
+def parse_duck_dynamics_mode(value: str | None) -> DynamicsMode:
+    mode = (value or "legacy").strip().lower()
+    if mode in ("legacy", "hybrid", "dynamic"):
+        return mode
+    return "legacy"
+
+
+# Dynamics migration mode. Phase 2A is instrumentation/scaffold only.
+DUCK_DYNAMICS_MODE: DynamicsMode = parse_duck_dynamics_mode(os.getenv("DUCK_DYNAMICS_MODE"))
 
 # ONNX model path for real MuJoCo inference
 _default_model = os.path.join(os.path.dirname(__file__), "models", "BEST_WALK_ONNX_2.onnx")
