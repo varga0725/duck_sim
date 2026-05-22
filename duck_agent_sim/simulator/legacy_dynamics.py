@@ -12,6 +12,8 @@ class LegacyDynamicsDiagnostics:
     qpos_xy_integration_count: int = 0
     qpos_z_forcing_count: int = 0
     torso_quaternion_overwrite_count: int = 0
+    torso_orientation_correction_magnitude_sum: float = 0.0
+    torso_orientation_correction_magnitude_max: float = 0.0
     qvel_xy_forcing_count: int = 0
     qvel_roll_pitch_zeroing_count: int = 0
     qvel_roll_pitch_damping_magnitude_sum: float = 0.0
@@ -51,6 +53,7 @@ class LegacyDynamicsController:
     hybrid_qvel_xy_scale: float = 1.0
     hybrid_z_force_scale: float = 1.0
     hybrid_rp_qvel_zero_scale: float = 1.0
+    hybrid_torso_orientation_scale: float = 1.0
     diagnostics: LegacyDynamicsDiagnostics = field(default_factory=LegacyDynamicsDiagnostics)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -82,10 +85,27 @@ class LegacyDynamicsController:
         cy = math.cos(yaw_rad / 2.0)
         sy = math.sin(yaw_rad / 2.0)
 
-        simulator.data.qpos[3] = cr * cp * cy + sr * sp * sy
-        simulator.data.qpos[4] = sr * cp * cy - cr * sp * sy
-        simulator.data.qpos[5] = cr * sp * cy + sr * cp * sy
-        simulator.data.qpos[6] = cr * cp * sy - sr * sp * cy
+        current_quat = np.array(simulator.data.qpos[3:7], dtype=float, copy=True)
+        target_quat = np.array(
+            [
+                cr * cp * cy + sr * sp * sy,
+                sr * cp * cy - cr * sp * sy,
+                cr * sp * cy + sr * cp * sy,
+                cr * cp * sy - sr * sp * cy,
+            ],
+            dtype=float,
+        )
+        torso_orientation_scale = self.hybrid_torso_orientation_scale if self.mode == "hybrid" else 1.0
+        torso_orientation_overwritten = not (self.mode == "hybrid" and torso_orientation_scale == 0.0)
+        torso_orientation_correction_magnitude = float(np.linalg.norm(target_quat - current_quat) * torso_orientation_scale)
+        if torso_orientation_overwritten:
+            if float(np.dot(current_quat, target_quat)) < 0.0:
+                target_quat = -target_quat
+            blended_quat = current_quat + (target_quat - current_quat) * torso_orientation_scale
+            norm = float(np.linalg.norm(blended_quat))
+            if norm > 1e-12:
+                blended_quat = blended_quat / norm
+            simulator.data.qpos[3:7] = blended_quat
 
         z_force_scale = self.hybrid_z_force_scale if self.mode == "hybrid" else 1.0
         target_z = 0.15
@@ -148,6 +168,8 @@ class LegacyDynamicsController:
             qpos_z_correction_magnitude=abs(float(z_correction)),
             rp_qvel_zeroed=rp_qvel_zeroed,
             rp_qvel_damping_magnitude=rp_qvel_damping_magnitude,
+            torso_orientation_overwritten=torso_orientation_overwritten,
+            torso_orientation_correction_magnitude=torso_orientation_correction_magnitude,
         )
 
     def record(
@@ -171,13 +193,20 @@ class LegacyDynamicsController:
         qpos_z_correction_magnitude: float,
         rp_qvel_zeroed: bool,
         rp_qvel_damping_magnitude: float,
+        torso_orientation_overwritten: bool,
+        torso_orientation_correction_magnitude: float,
     ) -> None:
         correction = float(np.linalg.norm(after_qpos - before_qpos) + np.linalg.norm(after_qvel - before_qvel))
         with self._lock:
             d = self.diagnostics
             d.qpos_xy_integration_count += int(qpos_xy_integrated)
             d.qpos_z_forcing_count += int(qpos_z_forced)
-            d.torso_quaternion_overwrite_count += 1
+            d.torso_quaternion_overwrite_count += int(torso_orientation_overwritten)
+            d.torso_orientation_correction_magnitude_sum += float(torso_orientation_correction_magnitude)
+            d.torso_orientation_correction_magnitude_max = max(
+                d.torso_orientation_correction_magnitude_max,
+                float(torso_orientation_correction_magnitude),
+            )
             d.qvel_xy_forcing_count += int(qvel_xy_forced)
             d.qvel_roll_pitch_zeroing_count += int(rp_qvel_zeroed)
             d.qvel_roll_pitch_damping_magnitude_sum += float(rp_qvel_damping_magnitude)

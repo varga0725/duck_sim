@@ -22,6 +22,7 @@ class DiagnosticCase:
     qvel_scale: float | None = None
     z_force_scale: float | None = None
     rp_qvel_zero_scale: float | None = None
+    torso_orientation_scale: float | None = None
 
 
 PHASE2D_MATRIX = (
@@ -49,6 +50,16 @@ PHASE2F_MATRIX = (
     DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_1_0", "hybrid", 0.0, 0.5, 1.0),
     DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_5", "hybrid", 0.0, 0.5, 0.5),
     DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_0", "hybrid", 0.0, 0.5, 0.0),
+)
+
+PHASE2G_MATRIX = (
+    DiagnosticCase("legacy", "legacy", None, None, None, None),
+    DiagnosticCase("hybrid_qvel_0_0_z_1_0_rp_0_5_torso_1_0", "hybrid", 0.0, 1.0, 0.5, 1.0),
+    DiagnosticCase("hybrid_qvel_0_0_z_1_0_rp_0_5_torso_0_5", "hybrid", 0.0, 1.0, 0.5, 0.5),
+    DiagnosticCase("hybrid_qvel_0_0_z_1_0_rp_0_5_torso_0_0", "hybrid", 0.0, 1.0, 0.5, 0.0),
+    DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_5_torso_1_0", "hybrid", 0.0, 0.5, 0.5, 1.0),
+    DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_5_torso_0_5", "hybrid", 0.0, 0.5, 0.5, 0.5),
+    DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_5_torso_0_0", "hybrid", 0.0, 0.5, 0.5, 0.0),
 )
 
 
@@ -105,6 +116,7 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
         "qvel_scale": os.environ.get("DUCK_HYBRID_QVEL_XY_SCALE"),
         "z_force_scale": os.environ.get("DUCK_HYBRID_Z_FORCE_SCALE"),
         "rp_qvel_zero_scale": os.environ.get("DUCK_HYBRID_RP_QVEL_ZERO_SCALE"),
+        "torso_orientation_scale": os.environ.get("DUCK_HYBRID_TORSO_ORIENTATION_SCALE"),
         "repeats": args.repeats,
         "duration_sec": args.duration_sec,
         "speed": args.speed,
@@ -238,6 +250,13 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                     "qpos_z_forcing_count": latest_dynamics.get("qpos_z_forcing_count"),
                     "qpos_z_correction_magnitude_sum": latest_dynamics.get("qpos_z_correction_magnitude_sum"),
                     "qpos_z_correction_magnitude_max": latest_dynamics.get("qpos_z_correction_magnitude_max"),
+                    "torso_quaternion_overwrite_count": latest_dynamics.get("torso_quaternion_overwrite_count"),
+                    "torso_orientation_correction_magnitude_sum": latest_dynamics.get(
+                        "torso_orientation_correction_magnitude_sum"
+                    ),
+                    "torso_orientation_correction_magnitude_max": latest_dynamics.get(
+                        "torso_orientation_correction_magnitude_max"
+                    ),
                     "qvel_roll_pitch_zeroing_count": latest_dynamics.get("qvel_roll_pitch_zeroing_count"),
                     "qvel_roll_pitch_damping_magnitude_sum": latest_dynamics.get(
                         "qvel_roll_pitch_damping_magnitude_sum"
@@ -315,6 +334,13 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
         summary["qpos_z_forcing_count"] = latest.get("qpos_z_forcing_count")
         summary["qpos_z_correction_magnitude_sum"] = latest.get("qpos_z_correction_magnitude_sum")
         summary["qpos_z_correction_magnitude_max"] = latest.get("qpos_z_correction_magnitude_max")
+        summary["torso_quaternion_overwrite_count"] = latest.get("torso_quaternion_overwrite_count")
+        summary["torso_orientation_correction_magnitude_sum"] = latest.get(
+            "torso_orientation_correction_magnitude_sum"
+        )
+        summary["torso_orientation_correction_magnitude_max"] = latest.get(
+            "torso_orientation_correction_magnitude_max"
+        )
         summary["qvel_roll_pitch_zeroing_count"] = latest.get("qvel_roll_pitch_zeroing_count")
         summary["qvel_roll_pitch_damping_magnitude_sum"] = latest.get("qvel_roll_pitch_damping_magnitude_sum")
         summary["qvel_roll_pitch_damping_magnitude_max"] = latest.get("qvel_roll_pitch_damping_magnitude_max")
@@ -333,7 +359,9 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
     results = []
-    if args.matrix == "phase2f":
+    if args.matrix == "phase2g":
+        matrix = PHASE2G_MATRIX
+    elif args.matrix == "phase2f":
         matrix = PHASE2F_MATRIX
     elif args.matrix == "phase2e":
         matrix = PHASE2E_MATRIX
@@ -357,6 +385,10 @@ def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
             env["DUCK_HYBRID_RP_QVEL_ZERO_SCALE"] = str(case.rp_qvel_zero_scale)
         else:
             env.pop("DUCK_HYBRID_RP_QVEL_ZERO_SCALE", None)
+        if case.torso_orientation_scale is not None:
+            env["DUCK_HYBRID_TORSO_ORIENTATION_SCALE"] = str(case.torso_orientation_scale)
+        else:
+            env.pop("DUCK_HYBRID_TORSO_ORIENTATION_SCALE", None)
 
         cmd = [
             sys.executable,
@@ -413,7 +445,7 @@ def main() -> int:
     parser.add_argument("--stable-wait-sec", type=float, default=0.25)
     parser.add_argument("--sample-period-sec", type=float, default=0.1)
     parser.add_argument("--speed", type=float, default=0.25)
-    parser.add_argument("--matrix", choices=("phase2d", "phase2e", "phase2f"), default="phase2d")
+    parser.add_argument("--matrix", choices=("phase2d", "phase2e", "phase2f", "phase2g"), default="phase2d")
     parser.add_argument("--output", default="docs/phase2d_moving_window_diagnostics_results.json")
     args = parser.parse_args()
 
