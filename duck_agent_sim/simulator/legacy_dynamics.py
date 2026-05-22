@@ -14,6 +14,8 @@ class LegacyDynamicsDiagnostics:
     torso_quaternion_overwrite_count: int = 0
     qvel_xy_forcing_count: int = 0
     qvel_roll_pitch_zeroing_count: int = 0
+    qpos_z_correction_magnitude_sum: float = 0.0
+    qpos_z_correction_magnitude_max: float = 0.0
     correction_magnitude_sum: float = 0.0
     correction_magnitude_max: float = 0.0
     contact_samples: int = 0
@@ -45,6 +47,7 @@ class LegacyDynamicsController:
     mode: str = "legacy"
     fixed_dt_sec: float = 0.002
     hybrid_qvel_xy_scale: float = 1.0
+    hybrid_z_force_scale: float = 1.0
     diagnostics: LegacyDynamicsDiagnostics = field(default_factory=LegacyDynamicsDiagnostics)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -81,8 +84,14 @@ class LegacyDynamicsController:
         simulator.data.qpos[5] = cr * sp * cy + sr * cp * sy
         simulator.data.qpos[6] = cr * cp * sy - sr * sp * cy
 
-        simulator.data.qpos[2] = 0.15
-        simulator.data.qvel[2] = 0.0
+        z_force_scale = self.hybrid_z_force_scale if self.mode == "hybrid" else 1.0
+        target_z = 0.15
+        before_z = float(simulator.data.qpos[2])
+        z_correction = (target_z - before_z) * z_force_scale
+        z_forced = not (self.mode == "hybrid" and z_force_scale == 0.0)
+        if z_forced:
+            simulator.data.qpos[2] = before_z + z_correction
+            simulator.data.qvel[2] = 0.0
 
         global_vx = simulator._current_linear_x * math.cos(yaw_rad) - simulator._current_linear_y * math.sin(yaw_rad)
         global_vy = simulator._current_linear_x * math.sin(yaw_rad) + simulator._current_linear_y * math.cos(yaw_rad)
@@ -107,7 +116,8 @@ class LegacyDynamicsController:
         left_contact = simulator.check_contact("foot_assembly", "floor")
         right_contact = simulator.check_contact("foot_assembly_2", "floor")
         actuator_saturation = self._actuator_saturation(simulator)
-        fall_reason = self._fall_reason(roll, pitch, float(simulator.data.qpos[2]))
+        body_height = float(simulator.data.qpos[2])
+        fall_reason = self._fall_reason(roll, pitch, body_height)
         qvel_xy_commanded_magnitude = math.hypot(applied_vx, applied_vy)
 
         self.record(
@@ -117,7 +127,7 @@ class LegacyDynamicsController:
             after_qvel=np.array(simulator.data.qvel[0:6], copy=True),
             roll_deg=roll,
             pitch_deg=pitch,
-            body_height_m=float(simulator.data.qpos[2]),
+            body_height_m=body_height,
             left_contact=left_contact,
             right_contact=right_contact,
             actuator_saturation=actuator_saturation,
@@ -125,6 +135,8 @@ class LegacyDynamicsController:
             qpos_xy_integrated=qpos_xy_integrated,
             qvel_xy_forced=qvel_xy_forced,
             qvel_xy_commanded_magnitude=qvel_xy_commanded_magnitude,
+            qpos_z_forced=z_forced,
+            qpos_z_correction_magnitude=abs(float(z_correction)),
         )
 
     def record(
@@ -144,15 +156,22 @@ class LegacyDynamicsController:
         qpos_xy_integrated: bool,
         qvel_xy_forced: bool,
         qvel_xy_commanded_magnitude: float,
+        qpos_z_forced: bool,
+        qpos_z_correction_magnitude: float,
     ) -> None:
         correction = float(np.linalg.norm(after_qpos - before_qpos) + np.linalg.norm(after_qvel - before_qvel))
         with self._lock:
             d = self.diagnostics
             d.qpos_xy_integration_count += int(qpos_xy_integrated)
-            d.qpos_z_forcing_count += 1
+            d.qpos_z_forcing_count += int(qpos_z_forced)
             d.torso_quaternion_overwrite_count += 1
             d.qvel_xy_forcing_count += int(qvel_xy_forced)
             d.qvel_roll_pitch_zeroing_count += 1
+            d.qpos_z_correction_magnitude_sum += float(qpos_z_correction_magnitude)
+            d.qpos_z_correction_magnitude_max = max(
+                d.qpos_z_correction_magnitude_max,
+                float(qpos_z_correction_magnitude),
+            )
             d.correction_magnitude_sum += correction
             d.correction_magnitude_max = max(d.correction_magnitude_max, correction)
             d.contact_samples += 1

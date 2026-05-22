@@ -20,13 +20,24 @@ class DiagnosticCase:
     name: str
     dynamics_mode: str
     qvel_scale: float | None = None
+    z_force_scale: float | None = None
 
 
-MATRIX = (
+PHASE2D_MATRIX = (
     DiagnosticCase("legacy", "legacy", None),
     DiagnosticCase("hybrid_scale_1_0", "hybrid", 1.0),
     DiagnosticCase("hybrid_scale_0_5", "hybrid", 0.5),
     DiagnosticCase("hybrid_scale_0_0", "hybrid", 0.0),
+)
+
+PHASE2E_MATRIX = (
+    DiagnosticCase("legacy", "legacy", None, None),
+    DiagnosticCase("hybrid_qvel_0_0_z_1_0", "hybrid", 0.0, 1.0),
+    DiagnosticCase("hybrid_qvel_0_0_z_0_5", "hybrid", 0.0, 0.5),
+    DiagnosticCase("hybrid_qvel_0_0_z_0_0", "hybrid", 0.0, 0.0),
+    DiagnosticCase("hybrid_qvel_1_0_z_1_0", "hybrid", 1.0, 1.0),
+    DiagnosticCase("hybrid_qvel_1_0_z_0_5", "hybrid", 1.0, 0.5),
+    DiagnosticCase("hybrid_qvel_1_0_z_0_0", "hybrid", 1.0, 0.0),
 )
 
 
@@ -40,6 +51,14 @@ def _min(values: list[float]) -> float | None:
 
 def _max(values: list[float]) -> float | None:
     return max(values) if values else None
+
+
+def _stats(values: list[float]) -> dict[str, float | None]:
+    return {"min": _min(values), "max": _max(values), "avg": _avg(values)}
+
+
+def _unwrap_delta_deg(start_deg: float, end_deg: float) -> float:
+    return ((end_deg - start_deg + 180.0) % 360.0) - 180.0
 
 
 def _latest_dynamics(simulator: Any) -> dict[str, Any]:
@@ -73,6 +92,7 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
         "name": args.case_name,
         "dynamics_mode": os.environ.get("DUCK_DYNAMICS_MODE", ""),
         "qvel_scale": os.environ.get("DUCK_HYBRID_QVEL_XY_SCALE"),
+        "z_force_scale": os.environ.get("DUCK_HYBRID_Z_FORCE_SCALE"),
         "repeats": args.repeats,
         "duration_sec": args.duration_sec,
         "speed": args.speed,
@@ -168,6 +188,24 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
             forward_displacement = float(end_pos[0]) - float(start_pos[0])
             lateral_displacement = float(end_pos[1]) - float(start_pos[1])
             yaw_displacement = float(end_yaw) - float(start_yaw)
+            yaw_unwrapped_displacement = _unwrap_delta_deg(float(start_yaw), float(end_yaw))
+            actuator_saturations = [
+                float(item["dynamics"]["last_actuator_saturation"])
+                for item in samples
+                if item["dynamics"] and item["dynamics"].get("last_actuator_saturation") is not None
+            ]
+            correction_sums = [
+                float(item["dynamics"]["correction_magnitude_sum"])
+                for item in samples
+                if item["dynamics"] and item["dynamics"].get("correction_magnitude_sum") is not None
+            ]
+            correction_rates = [
+                max(0.0, end - start) / max(args.sample_period_sec, 1e-9)
+                for start, end in zip(correction_sums, correction_sums[1:])
+            ]
+            no_contact_samples = sum(not (l or r) for l, r in zip(left_contacts, right_contacts))
+            first_fall_timestamp = next((sample["t"] for sample in samples if sample["fallen"]), None)
+            first_safety_timestamp = time.monotonic() if command_result.get("body", {}).get("safety_intervention") else None
 
             repeats.append(
                 {
@@ -177,6 +215,7 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                     "forward_displacement": forward_displacement,
                     "lateral_displacement": lateral_displacement,
                     "yaw_displacement": yaw_displacement,
+                    "yaw_unwrapped_displacement": yaw_unwrapped_displacement,
                     "actual_base_velocity": {
                         "x": forward_displacement / elapsed,
                         "y": lateral_displacement / elapsed,
@@ -184,6 +223,9 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                     "qpos_xy_integration_count": latest_dynamics.get("qpos_xy_integration_count"),
                     "qvel_xy_forcing_count": latest_dynamics.get("qvel_xy_forcing_count"),
                     "qvel_xy_commanded_magnitude": latest_dynamics.get("last_qvel_xy_commanded_magnitude"),
+                    "qpos_z_forcing_count": latest_dynamics.get("qpos_z_forcing_count"),
+                    "qpos_z_correction_magnitude_sum": latest_dynamics.get("qpos_z_correction_magnitude_sum"),
+                    "qpos_z_correction_magnitude_max": latest_dynamics.get("qpos_z_correction_magnitude_max"),
                     "contact_duty_factor": latest_dynamics.get("contact_duty_factor"),
                     "sampled_contact_ratio": {
                         "left": sum(left_contacts) / len(left_contacts) if left_contacts else 0.0,
@@ -192,14 +234,19 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                         if left_contacts
                         else 0.0,
                     },
-                    "roll_deg": {"min": _min(rolls), "max": _max(rolls), "avg": _avg(rolls)},
-                    "pitch_deg": {"min": _min(pitches), "max": _max(pitches), "avg": _avg(pitches)},
-                    "body_height_m": {"min": _min(heights), "max": _max(heights), "avg": _avg(heights)},
+                    "no_contact_duration_sec": no_contact_samples * args.sample_period_sec,
+                    "roll_deg": _stats(rolls),
+                    "pitch_deg": _stats(pitches),
+                    "body_height_m": _stats(heights),
                     "correction_magnitude_sum": latest_dynamics.get("correction_magnitude_sum"),
                     "correction_magnitude_max": latest_dynamics.get("correction_magnitude_max"),
+                    "correction_rate": _stats(correction_rates),
                     "actuator_saturation": latest_dynamics.get("last_actuator_saturation"),
+                    "actuator_saturation_window": _stats(actuator_saturations),
                     "fall_reason": latest_dynamics.get("last_fall_reason"),
+                    "fall_event_timestamp": first_fall_timestamp,
                     "safety_intervention_count": int(bool(command_result.get("body", {}).get("safety_intervention"))),
+                    "safety_event_timestamp": first_safety_timestamp,
                     "command_latency_sec": command_result.get("latency_sec"),
                     "command_status_code": command_result.get("status_code"),
                     "command_error": command_error,
@@ -225,7 +272,14 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
-    fields = ("forward_displacement", "lateral_displacement", "yaw_displacement", "command_latency_sec")
+    fields = (
+        "forward_displacement",
+        "lateral_displacement",
+        "yaw_displacement",
+        "yaw_unwrapped_displacement",
+        "command_latency_sec",
+        "no_contact_duration_sec",
+    )
     summary: dict[str, Any] = {}
     for field in fields:
         values = [float(item[field]) for item in repeats if item.get(field) is not None]
@@ -239,16 +293,26 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
         summary["qpos_xy_integration_count"] = latest.get("qpos_xy_integration_count")
         summary["qvel_xy_forcing_count"] = latest.get("qvel_xy_forcing_count")
         summary["qvel_xy_commanded_magnitude"] = latest.get("qvel_xy_commanded_magnitude")
+        summary["qpos_z_forcing_count"] = latest.get("qpos_z_forcing_count")
+        summary["qpos_z_correction_magnitude_sum"] = latest.get("qpos_z_correction_magnitude_sum")
+        summary["qpos_z_correction_magnitude_max"] = latest.get("qpos_z_correction_magnitude_max")
         summary["contact_duty_factor"] = latest.get("contact_duty_factor")
         summary["actuator_saturation"] = latest.get("actuator_saturation")
+        summary["actuator_saturation_window"] = latest.get("actuator_saturation_window")
+        summary["roll_deg"] = latest.get("roll_deg")
+        summary["pitch_deg"] = latest.get("pitch_deg")
+        summary["body_height_m"] = latest.get("body_height_m")
+        summary["correction_rate"] = latest.get("correction_rate")
         summary["fall_reason"] = latest.get("fall_reason")
+        summary["fall_event_count"] = sum(1 for item in repeats if item.get("fall_event_timestamp") is not None)
         summary["movement_detected"] = any(abs(float(item["forward_displacement"])) > 1e-4 for item in repeats)
     return summary
 
 
 def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
     results = []
-    for case in MATRIX:
+    matrix = PHASE2E_MATRIX if args.matrix == "phase2e" else PHASE2D_MATRIX
+    for case in matrix:
         env = os.environ.copy()
         env["DUCK_SIM_MODE"] = "real"
         env["DUCK_HEADLESS"] = "true"
@@ -258,6 +322,10 @@ def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
             env["DUCK_HYBRID_QVEL_XY_SCALE"] = str(case.qvel_scale)
         else:
             env.pop("DUCK_HYBRID_QVEL_XY_SCALE", None)
+        if case.z_force_scale is not None:
+            env["DUCK_HYBRID_Z_FORCE_SCALE"] = str(case.z_force_scale)
+        else:
+            env.pop("DUCK_HYBRID_Z_FORCE_SCALE", None)
 
         cmd = [
             sys.executable,
@@ -286,7 +354,8 @@ def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
         results.append(json.loads(lines[-1]))
 
     payload = {
-        "matrix": [case.__dict__ for case in MATRIX],
+        "matrix": [case.__dict__ for case in matrix],
+        "matrix_name": args.matrix,
         "profile": {
             "repeats": args.repeats,
             "duration_sec": args.duration_sec,
@@ -313,6 +382,7 @@ def main() -> int:
     parser.add_argument("--stable-wait-sec", type=float, default=0.25)
     parser.add_argument("--sample-period-sec", type=float, default=0.1)
     parser.add_argument("--speed", type=float, default=0.25)
+    parser.add_argument("--matrix", choices=("phase2d", "phase2e"), default="phase2d")
     parser.add_argument("--output", default="docs/phase2d_moving_window_diagnostics_results.json")
     args = parser.parse_args()
 

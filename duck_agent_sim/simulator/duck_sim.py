@@ -43,7 +43,12 @@ from duck_agent_sim.simulator.policy_contract import (
     clamp_targets_to_ctrlrange,
 )
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
-from duck_agent_sim.config import DUCK_DYNAMICS_MODE, DUCK_HYBRID_QVEL_XY_SCALE, DUCK_ONNX_MODEL_PATH
+from duck_agent_sim.config import (
+    DUCK_DYNAMICS_MODE,
+    DUCK_HYBRID_QVEL_XY_SCALE,
+    DUCK_HYBRID_Z_FORCE_SCALE,
+    DUCK_ONNX_MODEL_PATH,
+)
 
 
 
@@ -610,6 +615,7 @@ class RealDuckSimulator(DuckSimulator):
         self._legacy_dynamics = LegacyDynamicsController(
             mode=self._dynamics_mode,
             hybrid_qvel_xy_scale=DUCK_HYBRID_QVEL_XY_SCALE,
+            hybrid_z_force_scale=DUCK_HYBRID_Z_FORCE_SCALE,
         )
         
         # ONNX Control state variables

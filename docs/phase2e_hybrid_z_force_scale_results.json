@@ -1,0 +1,3171 @@
+{
+  "matrix": [
+    {
+      "dynamics_mode": "legacy",
+      "name": "legacy",
+      "qvel_scale": null,
+      "z_force_scale": null
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_0_0_z_1_0",
+      "qvel_scale": 0.0,
+      "z_force_scale": 1.0
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_0_0_z_0_5",
+      "qvel_scale": 0.0,
+      "z_force_scale": 0.5
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_0_0_z_0_0",
+      "qvel_scale": 0.0,
+      "z_force_scale": 0.0
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_1_0_z_1_0",
+      "qvel_scale": 1.0,
+      "z_force_scale": 1.0
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_1_0_z_0_5",
+      "qvel_scale": 1.0,
+      "z_force_scale": 0.5
+    },
+    {
+      "dynamics_mode": "hybrid",
+      "name": "hybrid_qvel_1_0_z_0_0",
+      "qvel_scale": 1.0,
+      "z_force_scale": 0.0
+    }
+  ],
+  "matrix_name": "phase2e",
+  "profile": {
+    "duration_sec": 2.0,
+    "repeats": 3,
+    "sample_period_sec": 0.1,
+    "speed": 0.25,
+    "stable_wait_sec": 0.25
+  },
+  "results": [
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "legacy",
+        "name": "legacy",
+        "qvel_scale": null,
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": null
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.2795932557085237,
+            "y": 0.00038884508628911016
+          },
+          "actuator_saturation": 0.9707180822500336,
+          "actuator_saturation_window": {
+            "avg": 0.9503035442318314,
+            "max": 0.99426295857492,
+            "min": 0.9156500994672551
+          },
+          "body_height_m": {
+            "avg": 0.15006841581022184,
+            "max": 0.1501200100318801,
+            "min": 0.15002201412617533
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0120654590427876,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.94067237969677,
+            "left": 0.980883322346737,
+            "right": 0.9591298615688859
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 157.5666413628162,
+          "correction_rate": {
+            "avg": 63.56617807449975,
+            "max": 98.18789627949862,
+            "min": 49.73637478996466
+          },
+          "end_position": [
+            0.556427465715303,
+            -0.000461749643993657,
+            0.1500695439287318
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.5625599323924383,
+          "lateral_displacement": 0.0007823817670408308,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.0583234488445,
+            "max": 4.012987159527334,
+            "min": -2.5605064367504236
+          },
+          "qpos_xy_integration_count": 1517,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.13790115026606492,
+          "qpos_z_forcing_count": 1517,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00022062496282160282,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.002830292098224163,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 1517,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.17531995995630684,
+            "max": 1.110904617156374,
+            "min": -0.4252161214908321
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.9,
+            "left": 1.0,
+            "right": 0.9
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.5297334805559191,
+              "min": -0.006132466677135255
+            },
+            "y": {
+              "max": 0.000491372573024234,
+              "min": -0.0032238312867003695
+            },
+            "yaw": {
+              "max": 359.9993175306688,
+              "min": 3.528980112390721e-05
+            }
+          },
+          "start_position": [
+            -0.006132466677135255,
+            -0.0012441314110344878,
+            0.15009282313600644
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9975835966609,
+          "yaw_unwrapped_displacement": 0.002416403339111639
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.2803403508127654,
+            "y": 0.00036237879028567355
+          },
+          "actuator_saturation": 0.9706961876991942,
+          "actuator_saturation_window": {
+            "avg": 0.9501982492766766,
+            "max": 0.9942431130808316,
+            "min": 0.9156733980014239
+          },
+          "body_height_m": {
+            "avg": 0.15006844451361395,
+            "max": 0.1501244005627468,
+            "min": 0.15002291916770502
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0056347080972046,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9337304542069993,
+            "left": 0.9787788533134772,
+            "right": 0.9545793000744601
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 294.48729287815604,
+          "correction_rate": {
+            "avg": 63.3248207043153,
+            "max": 98.2040051008596,
+            "min": 50.52262635014188
+          },
+          "end_position": [
+            0.556104418277449,
+            -0.0004530595032076776,
+            0.15006930160709253
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.5622603376702288,
+          "lateral_displacement": 0.000726799479275225,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.091396933439554,
+            "max": 4.0129083817928795,
+            "min": -2.5713050135705244
+          },
+          "qpos_xy_integration_count": 2686,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.23454326198207,
+          "qpos_z_forcing_count": 2686,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.000138541916385293,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.0011832499876618385,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 2686,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.1655212756543037,
+            "max": 1.0915711245937236,
+            "min": -0.42745044017900646
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.5297146176933242,
+              "min": -0.006155919392779752
+            },
+            "y": {
+              "max": 0.000523838572172458,
+              "min": -0.003306691450759117
+            },
+            "yaw": {
+              "max": 359.9996247572639,
+              "min": 0.000605541543917456
+            }
+          },
+          "start_position": [
+            -0.006155919392779752,
+            -0.0011798589824829025,
+            0.15009274619393398
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9970500530171,
+          "yaw_unwrapped_displacement": 0.002949946982880647
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.2810878014804159,
+            "y": 0.00037254126559627305
+          },
+          "actuator_saturation": 0.9707173612856212,
+          "actuator_saturation_window": {
+            "avg": 0.9505203685870335,
+            "max": 0.9942634898118554,
+            "min": 0.9156544631992248
+          },
+          "body_height_m": {
+            "avg": 0.15006747901157907,
+            "max": 0.15012409052171122,
+            "min": 0.15002192315781523
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0043400421272963,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9308110909562063,
+            "left": 0.9779735682819384,
+            "right": 0.9525783881834672
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 431.8231658555619,
+          "correction_rate": {
+            "avg": 63.53453559796668,
+            "max": 96.64662402262763,
+            "min": 49.92240088155938
+          },
+          "end_position": [
+            0.5572733354208552,
+            -0.000487460334306848,
+            0.1500723746648743
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.5633955358607259,
+          "lateral_displacement": 0.0007466993759793902,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.0793692161664645,
+            "max": 4.012991241941164,
+            "min": -2.5703840904611845
+          },
+          "qpos_xy_integration_count": 3859,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.3310974627000146,
+          "qpos_z_forcing_count": 3859,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00011541694402694702,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0008398750796914101,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 3859,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.17533377444676118,
+            "max": 1.104731668388045,
+            "min": -0.4227241945039913
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.9,
+            "left": 1.0,
+            "right": 0.9
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.5297497408205838,
+              "min": -0.006122200439870644
+            },
+            "y": {
+              "max": 0.00047350908491377967,
+              "min": -0.003368014679362088
+            },
+            "yaw": {
+              "max": 359.99931068719576,
+              "min": 0.0004131876056496418
+            }
+          },
+          "start_position": [
+            -0.006122200439870644,
+            -0.0012341597102862381,
+            0.1500925951956516
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9967906060015,
+          "yaw_unwrapped_displacement": 0.003209393998474752
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9707173612856212,
+        "actuator_saturation_window": {
+          "avg": 0.9505203685870335,
+          "max": 0.9942634898118554,
+          "min": 0.9156544631992248
+        },
+        "body_height_m": {
+          "avg": 0.15006747901157907,
+          "max": 0.15012409052171122,
+          "min": 0.15002192315781523
+        },
+        "command_latency_sec": {
+          "avg": 2.0073467364224293,
+          "max": 2.0120654590427876,
+          "min": 2.0043400421272963
+        },
+        "contact_duty_factor": {
+          "both": 0.9308110909562063,
+          "left": 0.9779735682819384,
+          "right": 0.9525783881834672
+        },
+        "correction_rate": {
+          "avg": 63.53453559796668,
+          "max": 96.64662402262763,
+          "min": 49.92240088155938
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.5627386019744643,
+          "max": 0.5633955358607259,
+          "min": 0.5622603376702288
+        },
+        "lateral_displacement": {
+          "avg": 0.0007519602074318154,
+          "max": 0.0007823817670408308,
+          "min": 0.000726799479275225
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 2.0793692161664645,
+          "max": 4.012991241941164,
+          "min": -2.5703840904611845
+        },
+        "qpos_xy_integration_count": 3859,
+        "qpos_z_correction_magnitude_max": 0.013296972868246604,
+        "qpos_z_correction_magnitude_sum": 0.3310974627000146,
+        "qpos_z_forcing_count": 3859,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.14999998456292887,
+        "qvel_xy_forcing_count": 3859,
+        "roll_deg": {
+          "avg": 0.17533377444676118,
+          "max": 1.104731668388045,
+          "min": -0.4227241945039913
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -359.9971414185598,
+          "max": -359.9967906060015,
+          "min": -359.9975835966609
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": 0.0028585814401556795,
+          "max": 0.003209393998474752,
+          "min": 0.002416403339111639
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_0_0_z_1_0",
+        "qvel_scale": "0.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "1.0"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.029768787455934854,
+            "y": 0.006641482935025593
+          },
+          "actuator_saturation": 0.9687234013939221,
+          "actuator_saturation_window": {
+            "avg": 0.9486471114188919,
+            "max": 0.9839693322587754,
+            "min": 0.9198795802742993
+          },
+          "body_height_m": {
+            "avg": 0.1500794087827839,
+            "max": 0.15012283872970794,
+            "min": 0.15003557361052328
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0060123330913484,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9992987377279102,
+            "left": 0.9992987377279102,
+            "right": 0.9992987377279102
+          },
+          "correction_magnitude_max": 0.43170452684433286,
+          "correction_magnitude_sum": 132.42046162539063,
+          "correction_rate": {
+            "avg": 50.22567783325644,
+            "max": 70.22120825256565,
+            "min": 29.881422820855335
+          },
+          "end_position": [
+            0.07271817615287407,
+            0.0019539232799230016,
+            0.15007515598744284
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.059716554777780345,
+          "lateral_displacement": 0.013322896677677066,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.8579144954629998,
+            "max": 2.883010069164677,
+            "min": -1.8369387536384891
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.14199322902578543,
+          "qpos_z_forcing_count": 1426,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00020966585725545883,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.002519457833841443,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.11316179417648489,
+            "max": 1.5076227132036586,
+            "min": -0.8978622367213074
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06537195832579829,
+              "min": 0.013001621375093725
+            },
+            "y": {
+              "max": 0.015698743341585643,
+              "min": -0.02658276510215582
+            },
+            "yaw": {
+              "max": 359.9995801521743,
+              "min": 0.004996743087225714
+            }
+          },
+          "start_position": [
+            0.013001621375093725,
+            -0.011368973397754065,
+            0.15008276790910643
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.001981690310344675,
+          "yaw_unwrapped_displacement": -0.001981690310344675
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.030160329494952922,
+            "y": 0.006171900889766111
+          },
+          "actuator_saturation": 0.9686783221454001,
+          "actuator_saturation_window": {
+            "avg": 0.9487602421188447,
+            "max": 0.9840854075291702,
+            "min": 0.9196932299464441
+          },
+          "body_height_m": {
+            "avg": 0.15007959794309567,
+            "max": 0.15012349501804056,
+            "min": 0.15003571338760027
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0056924170348793,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9996150885296382,
+            "left": 0.9996150885296382,
+            "right": 0.9996150885296382
+          },
+          "correction_magnitude_max": 0.43170452684433286,
+          "correction_magnitude_sum": 247.95429130587786,
+          "correction_rate": {
+            "avg": 50.302206456636945,
+            "max": 70.54266776824761,
+            "min": 30.814072897644564
+          },
+          "end_position": [
+            0.07332562880989217,
+            0.001779593349677538,
+            0.15007779024959553
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.06049234416330049,
+          "lateral_displacement": 0.012378934813294712,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.8605436131012839,
+            "max": 2.894871638062618,
+            "min": -1.8509983008386621
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.25018009442735045,
+          "qpos_z_forcing_count": 2598,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.00022924994118511677,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.00125345797277987,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.10542351692080028,
+            "max": 1.4727346028843442,
+            "min": -0.8947595590397901
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06552768415654928,
+              "min": 0.012833284646591687
+            },
+            "y": {
+              "max": 0.01569449311190495,
+              "min": -0.026368588668027035
+            },
+            "yaw": {
+              "max": 359.99928392675815,
+              "min": 0.004763130196118818
+            }
+          },
+          "start_position": [
+            0.012833284646591687,
+            -0.010599341463617174,
+            0.15008414675670084
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.0011854212817183907,
+          "yaw_unwrapped_displacement": -0.0011854212817183907
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.0297118945272636,
+            "y": 0.006485659467783357
+          },
+          "actuator_saturation": 0.9750212152636278,
+          "actuator_saturation_window": {
+            "avg": 0.9483868167041724,
+            "max": 0.986095835765868,
+            "min": 0.9197730293232471
+          },
+          "body_height_m": {
+            "avg": 0.15008056808731454,
+            "max": 0.15012277871002538,
+            "min": 0.1500366025128341
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0058454170357436,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9997347480106101,
+            "left": 0.9997347480106101,
+            "right": 0.9997347480106101
+          },
+          "correction_magnitude_max": 0.43170452684433286,
+          "correction_magnitude_sum": 362.3687126281084,
+          "correction_rate": {
+            "avg": 49.868618407888576,
+            "max": 67.18890986882968,
+            "min": 28.20512335838373
+          },
+          "end_position": [
+            0.07214307631483478,
+            0.0027192745032905163,
+            0.15007090826021482
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.059597467468961086,
+          "lateral_displacement": 0.013009230319907725,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.8522796188255644,
+            "max": 2.8804824751118505,
+            "min": -1.8712541105269258
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.35844953546738406,
+          "qpos_z_forcing_count": 3770,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00013458402827382088,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0010261659044772387,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.10146835027644116,
+            "max": 1.467787619583559,
+            "min": -0.9273795978728423
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06485167717509903,
+              "min": 0.012545608845873699
+            },
+            "y": {
+              "max": 0.01593772610713663,
+              "min": -0.02730622155283939
+            },
+            "yaw": {
+              "max": 359.99937149401393,
+              "min": 0.0002958531617632421
+            }
+          },
+          "start_position": [
+            0.012545608845873699,
+            -0.01028995581661721,
+            0.15008554509801147
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.0024696674100255223,
+          "yaw_unwrapped_displacement": -0.0024696674100255223
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9750212152636278,
+        "actuator_saturation_window": {
+          "avg": 0.9483868167041724,
+          "max": 0.986095835765868,
+          "min": 0.9197730293232471
+        },
+        "body_height_m": {
+          "avg": 0.15008056808731454,
+          "max": 0.15012277871002538,
+          "min": 0.1500366025128341
+        },
+        "command_latency_sec": {
+          "avg": 2.005850055720657,
+          "max": 2.0060123330913484,
+          "min": 2.0056924170348793
+        },
+        "contact_duty_factor": {
+          "both": 0.9997347480106101,
+          "left": 0.9997347480106101,
+          "right": 0.9997347480106101
+        },
+        "correction_rate": {
+          "avg": 49.868618407888576,
+          "max": 67.18890986882968,
+          "min": 28.20512335838373
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.05993545547001397,
+          "max": 0.06049234416330049,
+          "min": 0.059597467468961086
+        },
+        "lateral_displacement": {
+          "avg": 0.012903687270293169,
+          "max": 0.013322896677677066,
+          "min": 0.012378934813294712
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 0.8522796188255644,
+          "max": 2.8804824751118505,
+          "min": -1.8712541105269258
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.013296972868246604,
+        "qpos_z_correction_magnitude_sum": 0.35844953546738406,
+        "qpos_z_forcing_count": 3770,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.0,
+        "qvel_xy_forcing_count": 0,
+        "roll_deg": {
+          "avg": 0.10146835027644116,
+          "max": 1.467787619583559,
+          "min": -0.9273795978728423
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -0.0018789263340295292,
+          "max": -0.0011854212817183907,
+          "min": -0.0024696674100255223
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": -0.0018789263340295292,
+          "max": -0.0011854212817183907,
+          "min": -0.0024696674100255223
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_0_0_z_0_5",
+        "qvel_scale": "0.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "0.5"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.030165522877867626,
+            "y": 0.006029300188412084
+          },
+          "actuator_saturation": 0.9621881246140724,
+          "actuator_saturation_window": {
+            "avg": 0.9483985892941167,
+            "max": 0.9844366689799857,
+            "min": 0.9197721945223486
+          },
+          "body_height_m": {
+            "avg": 0.15015978416914627,
+            "max": 0.15024481363690223,
+            "min": 0.1500666068999145
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0080805828329176,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9993169398907104,
+            "left": 0.9993169398907104,
+            "right": 0.9993169398907104
+          },
+          "correction_magnitude_max": 0.4250578919493222,
+          "correction_magnitude_sum": 135.71285777972332,
+          "correction_rate": {
+            "avg": 50.45235717971656,
+            "max": 70.23001612656898,
+            "min": 28.317256729145583
+          },
+          "end_position": [
+            0.07309541679706644,
+            0.0014104823039788484,
+            0.15016061041706666
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.06057480076204813,
+          "lateral_displacement": 0.012107320636421158,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.8429296975840558,
+            "max": 2.867737729138193,
+            "min": -1.8824795966676153
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.14368155062945512,
+          "qpos_z_forcing_count": 1464,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00011937483213841915,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.007922833086922765,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.11250087540955647,
+            "max": 1.5105006211775818,
+            "min": -0.8828806059536041
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06506266797377179,
+              "min": 0.01252061603501831
+            },
+            "y": {
+              "max": 0.015668397553316067,
+              "min": -0.02715332484013857
+            },
+            "yaw": {
+              "max": 359.99940387378297,
+              "min": 0.003972691834520943
+            }
+          },
+          "start_position": [
+            0.01252061603501831,
+            -0.01069683833244231,
+            0.15016589038432102
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.0006777089234333289,
+          "yaw_unwrapped_displacement": -0.0006777089234333289
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.029842590803707394,
+            "y": 0.006402717562171803
+          },
+          "actuator_saturation": 0.9685993955149911,
+          "actuator_saturation_window": {
+            "avg": 0.948143413426725,
+            "max": 0.9840023827852591,
+            "min": 0.9198115440010669
+          },
+          "body_height_m": {
+            "avg": 0.15015977357803031,
+            "max": 0.15024505231125335,
+            "min": 0.150073536714599
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0086307919118553,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9996204933586338,
+            "left": 0.9996204933586338,
+            "right": 0.9996204933586338
+          },
+          "correction_magnitude_max": 0.4250578919493222,
+          "correction_magnitude_sum": 250.14457223768946,
+          "correction_rate": {
+            "avg": 49.96223332836161,
+            "max": 69.0453390441678,
+            "min": 27.40009195628403
+          },
+          "end_position": [
+            0.0725027180177433,
+            0.002200355954653998,
+            0.1501485684625424
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.059942746798752236,
+          "lateral_displacement": 0.012860695647293093,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.8331066539061218,
+            "max": 2.8623951657532802,
+            "min": -1.858066797592997
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.25139075041452097,
+          "qpos_z_forcing_count": 2635,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.00013354187831282616,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.0014402088709175587,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.10573024517934766,
+            "max": 1.4723512674943007,
+            "min": -0.9015117483172296
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06452816271016255,
+              "min": 0.012559971218991063
+            },
+            "y": {
+              "max": 0.01574315826729615,
+              "min": -0.026920761818234704
+            },
+            "yaw": {
+              "max": 359.9993553562457,
+              "min": 0.0005068528863311
+            }
+          },
+          "start_position": [
+            0.012559971218991063,
+            -0.010660339692639095,
+            0.15016651829496994
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.0016981006075411642,
+          "yaw_unwrapped_displacement": -0.0016981006075411642
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.02969238109172347,
+            "y": 0.006292453175523425
+          },
+          "actuator_saturation": 0.9684745548351613,
+          "actuator_saturation_window": {
+            "avg": 0.9485254885170713,
+            "max": 0.9840165744005346,
+            "min": 0.9198918746148054
+          },
+          "body_height_m": {
+            "avg": 0.15015938753994326,
+            "max": 0.1502451278584732,
+            "min": 0.1500726944297387
+          },
+          "command_error": null,
+          "command_latency_sec": 2.003415834158659,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9997370496976071,
+            "left": 0.9997370496976071,
+            "right": 0.9997370496976071
+          },
+          "correction_magnitude_max": 0.4250578919493222,
+          "correction_magnitude_sum": 364.66140028078144,
+          "correction_rate": {
+            "avg": 49.76527593682823,
+            "max": 67.59673774154635,
+            "min": 27.889343405409477
+          },
+          "end_position": [
+            0.07196918713402112,
+            0.0022346698965591836,
+            0.1501463681405156
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.05948618643303197,
+          "lateral_displacement": 0.012606400327545564,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.832512535158315,
+            "max": 2.863110094319403,
+            "min": -1.8616478475644593
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.358554090835856,
+          "qpos_z_forcing_count": 3803,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00011974992230534554,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0009710830636322498,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.10018674880681591,
+            "max": 1.4626707090288003,
+            "min": -0.8964309318505975
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 1.0,
+            "left": 1.0,
+            "right": 1.0
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.06430272915227,
+              "min": 0.012483000700989151
+            },
+            "y": {
+              "max": 0.015728881792707552,
+              "min": -0.026026214010266283
+            },
+            "yaw": {
+              "max": 359.99935891357967,
+              "min": 6.414847460545628e-05
+            }
+          },
+          "start_position": [
+            0.012483000700989151,
+            -0.01037173043098638,
+            0.1501667893622939
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -0.0019387178939496152,
+          "yaw_unwrapped_displacement": -0.0019387178939496152
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9684745548351613,
+        "actuator_saturation_window": {
+          "avg": 0.9485254885170713,
+          "max": 0.9840165744005346,
+          "min": 0.9198918746148054
+        },
+        "body_height_m": {
+          "avg": 0.15015938753994326,
+          "max": 0.1502451278584732,
+          "min": 0.1500726944297387
+        },
+        "command_latency_sec": {
+          "avg": 2.006709069634477,
+          "max": 2.0086307919118553,
+          "min": 2.003415834158659
+        },
+        "contact_duty_factor": {
+          "both": 0.9997370496976071,
+          "left": 0.9997370496976071,
+          "right": 0.9997370496976071
+        },
+        "correction_rate": {
+          "avg": 49.76527593682823,
+          "max": 67.59673774154635,
+          "min": 27.889343405409477
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.060001244664610785,
+          "max": 0.06057480076204813,
+          "min": 0.05948618643303197
+        },
+        "lateral_displacement": {
+          "avg": 0.012524805537086604,
+          "max": 0.012860695647293093,
+          "min": 0.012107320636421158
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 0.832512535158315,
+          "max": 2.863110094319403,
+          "min": -1.8616478475644593
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.006648486434123302,
+        "qpos_z_correction_magnitude_sum": 0.358554090835856,
+        "qpos_z_forcing_count": 3803,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.0,
+        "qvel_xy_forcing_count": 0,
+        "roll_deg": {
+          "avg": 0.10018674880681591,
+          "max": 1.4626707090288003,
+          "min": -0.8964309318505975
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -0.001438175808308036,
+          "max": -0.0006777089234333289,
+          "min": -0.0019387178939496152
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": -0.001438175808308036,
+          "max": -0.0006777089234333289,
+          "min": -0.0019387178939496152
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_0_0_z_0_0",
+        "qvel_scale": "0.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "0.0"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": -0.015511765679964276,
+            "y": 0.001684189569405513
+          },
+          "actuator_saturation": 0.9700632947816017,
+          "actuator_saturation_window": {
+            "avg": 0.9539089563462358,
+            "max": 0.9990297855421673,
+            "min": 0.9189553418431105
+          },
+          "body_height_m": {
+            "avg": 0.16650997136280093,
+            "max": 0.1717665674044412,
+            "min": 0.15983743622713625
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0063595408573747,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.3998609179415855,
+            "left": 0.6397774687065368,
+            "right": 0.7552155771905424
+          },
+          "correction_magnitude_max": 0.41703046654142867,
+          "correction_magnitude_sum": 92.2251016683605,
+          "correction_rate": {
+            "avg": 36.53581558023768,
+            "max": 82.44578828431443,
+            "min": 14.681036426069696
+          },
+          "end_position": [
+            -0.023561844825954373,
+            0.0008722857572180018,
+            0.16510684969132552
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": -0.031122179067540306,
+          "lateral_displacement": 0.0033790898111892244,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": -1.6047801316371637,
+            "max": -1.0397243411085264,
+            "min": -2.302858045714392
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00015983288176357746,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.0026395409367978573,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.19500856351605592,
+            "max": 0.8823614466110097,
+            "min": -0.5170101245469751
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.3,
+            "left": 0.65,
+            "right": 0.65
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.00781516886647749,
+              "min": -0.05016152898080252
+            },
+            "y": {
+              "max": 0.014457277699985237,
+              "min": -0.004887238616946642
+            },
+            "yaw": {
+              "max": 359.9996183641408,
+              "min": 0.0008072345390046432
+            }
+          },
+          "start_position": [
+            0.007560334241585933,
+            -0.0025068040539712225,
+            0.1634881141388688
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": 0.0007411401012862634,
+          "yaw_unwrapped_displacement": 0.0007411401012973329
+        },
+        {
+          "actual_base_velocity": {
+            "x": -0.017991160406893438,
+            "y": 0.0019747521788025272
+          },
+          "actuator_saturation": 0.9616440621011855,
+          "actuator_saturation_window": {
+            "avg": 0.9530629653210886,
+            "max": 0.9999999000772815,
+            "min": 0.9157199191787707
+          },
+          "body_height_m": {
+            "avg": 0.1664514101127584,
+            "max": 0.17227994167293903,
+            "min": 0.15980063145797377
+          },
+          "command_error": null,
+          "command_latency_sec": 2.010124749969691,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.3962480857580398,
+            "left": 0.6711332312404288,
+            "right": 0.72052067381317
+          },
+          "correction_magnitude_max": 0.41703046654142867,
+          "correction_magnitude_sum": 175.22203771167182,
+          "correction_rate": {
+            "avg": 37.99265109418586,
+            "max": 74.11111358224588,
+            "min": 12.794716487437938
+          },
+          "end_position": [
+            -0.03139946717401502,
+            -0.0007965146516398901,
+            0.1659741714800787
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": -0.03616447681457128,
+          "lateral_displacement": 0.0039694982296675325,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": -1.6628546249054985,
+            "max": -1.1470303850539325,
+            "min": -2.2887101675034875
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.0001735000405460596,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.0008491659536957741,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.18344117496377965,
+            "max": 0.8707199969356214,
+            "min": -0.5124727960516153
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.45,
+            "left": 0.7,
+            "right": 0.75
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.006752130371857173,
+              "min": -0.06233430394065079
+            },
+            "y": {
+              "max": 0.012549385298108822,
+              "min": -0.010171007490823359
+            },
+            "yaw": {
+              "max": 359.9998600218475,
+              "min": 0.0002610238955168985
+            }
+          },
+          "start_position": [
+            0.00476500964055626,
+            -0.004766012881307423,
+            0.16410294794311453
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": 0.0020289837179096075,
+          "yaw_unwrapped_displacement": 0.002028983717906385
+        },
+        {
+          "actual_base_velocity": {
+            "x": -0.020587429504270338,
+            "y": 0.0059926056271425296
+          },
+          "actuator_saturation": 0.9845985065178197,
+          "actuator_saturation_window": {
+            "avg": 0.953156533520463,
+            "max": 0.9999999000772815,
+            "min": 0.9160316793688864
+          },
+          "body_height_m": {
+            "avg": 0.16664093766918042,
+            "max": 0.17216636869173815,
+            "min": 0.16183430045195854
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0099868751131,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.405607476635514,
+            "left": 0.6841121495327103,
+            "right": 0.716154873164219
+          },
+          "correction_magnitude_max": 0.41703046654142867,
+          "correction_magnitude_sum": 254.40349615562724,
+          "correction_rate": {
+            "avg": 38.34257789529178,
+            "max": 84.09977360659326,
+            "min": 14.964042981048351
+          },
+          "end_position": [
+            -0.03643822154517463,
+            0.007587553399154941,
+            0.1601098581680733
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": -0.04138046309589957,
+          "lateral_displacement": 0.01204505865828539,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": -1.6426924138412466,
+            "max": -1.0431738360477862,
+            "min": -2.319098701103002
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00016816705465316772,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0011530830524861813,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.0,
+          "qvel_xy_forcing_count": 0,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.014827937164813506,
+            "max": 0.7515320473037903,
+            "min": -0.699951891115416
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.2631578947368421,
+            "left": 0.6842105263157895,
+            "right": 0.5789473684210527
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.00907666178887098,
+              "min": -0.05556914146156237
+            },
+            "y": {
+              "max": 0.01852332027259227,
+              "min": -0.010300279151962586
+            },
+            "yaw": {
+              "max": 359.999905644088,
+              "min": 0.0007303021655777093
+            }
+          },
+          "start_position": [
+            0.004942241550724942,
+            -0.004457505259130449,
+            0.16409110519252776
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 19,
+            "stable": true
+          },
+          "yaw_displacement": -0.0031181548130803094,
+          "yaw_unwrapped_displacement": -0.0031181548130803094
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9845985065178197,
+        "actuator_saturation_window": {
+          "avg": 0.953156533520463,
+          "max": 0.9999999000772815,
+          "min": 0.9160316793688864
+        },
+        "body_height_m": {
+          "avg": 0.16664093766918042,
+          "max": 0.17216636869173815,
+          "min": 0.16183430045195854
+        },
+        "command_latency_sec": {
+          "avg": 2.0088237219800553,
+          "max": 2.010124749969691,
+          "min": 2.0063595408573747
+        },
+        "contact_duty_factor": {
+          "both": 0.405607476635514,
+          "left": 0.6841121495327103,
+          "right": 0.716154873164219
+        },
+        "correction_rate": {
+          "avg": 38.34257789529178,
+          "max": 84.09977360659326,
+          "min": 14.964042981048351
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": -0.036222372992670386,
+          "max": -0.031122179067540306,
+          "min": -0.04138046309589957
+        },
+        "lateral_displacement": {
+          "avg": 0.0064645488997140494,
+          "max": 0.01204505865828539,
+          "min": 0.0033790898111892244
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": -1.6426924138412466,
+          "max": -1.0431738360477862,
+          "min": -2.319098701103002
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.0,
+        "qpos_z_correction_magnitude_sum": 0.0,
+        "qpos_z_forcing_count": 0,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.0,
+        "qvel_xy_forcing_count": 0,
+        "roll_deg": {
+          "avg": 0.014827937164813506,
+          "max": 0.7515320473037903,
+          "min": -0.699951891115416
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -0.00011601033129481285,
+          "max": 0.0020289837179096075,
+          "min": -0.0031181548130803094
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": -0.00011601033129219711,
+          "max": 0.002028983717906385,
+          "min": -0.0031181548130803094
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_1_0_z_1_0",
+        "qvel_scale": "1.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "1.0"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.13585868080360156,
+            "y": 0.0003765319776370246
+          },
+          "actuator_saturation": 0.9636487605680796,
+          "actuator_saturation_window": {
+            "avg": 0.9500101667369568,
+            "max": 0.9968681824518398,
+            "min": 0.9127093994656015
+          },
+          "body_height_m": {
+            "avg": 0.15006816893961522,
+            "max": 0.1501198859344417,
+            "min": 0.15002262414151546
+          },
+          "command_error": null,
+          "command_latency_sec": 2.006889875046909,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9395790902919212,
+            "left": 0.9803122878479293,
+            "right": 0.9585879158180584
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 156.92055322897485,
+          "correction_rate": {
+            "avg": 63.75882477843684,
+            "max": 97.9085827816234,
+            "min": 49.12771472529812
+          },
+          "end_position": [
+            0.2665063590445851,
+            -0.0005021756175251232,
+            0.15007453018439196
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2726534109419778,
+          "lateral_displacement": 0.0007556582135511338,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.069185469860825,
+            "max": 4.013002092092054,
+            "min": -2.561977417589447
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.13482871142243888,
+          "qpos_z_forcing_count": 1473,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00017224997282028198,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.0013516249600797892,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998687848953,
+          "qvel_xy_forcing_count": 1473,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.18040801614104382,
+            "max": 1.124398104559178,
+            "min": -0.4247482056738775
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.2552839562686131,
+              "min": -0.006147051897392717
+            },
+            "y": {
+              "max": 0.000480517158084484,
+              "min": -0.0033586092902327387
+            },
+            "yaw": {
+              "max": 359.9992671042598,
+              "min": 0.0005548619139439129
+            }
+          },
+          "start_position": [
+            -0.006147051897392717,
+            -0.001257833831076257,
+            0.1500928383082351
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9973445298855,
+          "yaw_unwrapped_displacement": 0.002655470114518721
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13558902572804543,
+            "y": 0.0003741672237945553
+          },
+          "actuator_saturation": 0.9706988438838714,
+          "actuator_saturation_window": {
+            "avg": 0.9499914064840367,
+            "max": 0.9942427715713731,
+            "min": 0.9156550323816557
+          },
+          "body_height_m": {
+            "avg": 0.15006843207067638,
+            "max": 0.15012003143928032,
+            "min": 0.15002292875629164
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0030132920946926,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9331318473743861,
+            "left": 0.9784661881375142,
+            "right": 0.9542878730638459
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 293.68440050614686,
+          "correction_rate": {
+            "avg": 63.394099481166606,
+            "max": 94.9991361730477,
+            "min": 49.950295656846606
+          },
+          "end_position": [
+            0.2654519784042493,
+            -0.0004615837834238861,
+            0.15006955476279701
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.27158662079544427,
+          "lateral_displacement": 0.0007494619227266638,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.059595873469738,
+            "max": 4.012984762815574,
+            "min": -2.5626515617656387
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.23192328062258732,
+          "qpos_z_forcing_count": 2647,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.00020337500609457493,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.0010702500585466623,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 2647,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.1730746863305007,
+            "max": 1.1064226693417705,
+            "min": -0.4276490556479572
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.25242484458775344,
+              "min": -0.006134642391194978
+            },
+            "y": {
+              "max": 0.0004246130930256073,
+              "min": -0.003199440617936344
+            },
+            "yaw": {
+              "max": 359.9992743092457,
+              "min": 2.8026000568046755e-05
+            }
+          },
+          "start_position": [
+            -0.006134642391194978,
+            -0.00121104570615055,
+            0.15009303822272868
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.997406278286,
+          "yaw_unwrapped_displacement": 0.002593721713992636
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13573379173319827,
+            "y": 0.0003584108785888604
+          },
+          "actuator_saturation": 0.9706961876991942,
+          "actuator_saturation_window": {
+            "avg": 0.9500663848856504,
+            "max": 0.9942431130808316,
+            "min": 0.9127103481029862
+          },
+          "body_height_m": {
+            "avg": 0.1500680309071342,
+            "max": 0.15012440011088243,
+            "min": 0.1500229191651394
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0049042080063373,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.930628272251309,
+            "left": 0.9777486910994765,
+            "right": 0.9526178010471205
+          },
+          "correction_magnitude_max": 0.43655637965186433,
+          "correction_magnitude_sum": 430.892453725571,
+          "correction_rate": {
+            "avg": 63.48118782737036,
+            "max": 96.69384187442631,
+            "min": 49.42087172603294
+          },
+          "end_position": [
+            0.2659773123124573,
+            -0.0004613426553901307,
+            0.15007295089435613
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.272133250214545,
+          "lateral_displacement": 0.0007185794786780547,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.08448914758973,
+            "max": 4.0129083683315505,
+            "min": -2.5712981899164284
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.013296972868246604,
+          "qpos_z_correction_magnitude_sum": 0.32867950206344687,
+          "qpos_z_forcing_count": 3820,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00013320893049240112,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0010442088823765516,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 3820,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.167059474270147,
+            "max": 1.0915681894463993,
+            "min": -0.42745251657598216
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.2524146032358025,
+              "min": -0.006155937902087662
+            },
+            "y": {
+              "max": 0.0005238424984158785,
+              "min": -0.0033066927631339965
+            },
+            "yaw": {
+              "max": 359.99962481322314,
+              "min": 0.0006055430265868274
+            }
+          },
+          "start_position": [
+            -0.006155937902087662,
+            -0.0011799221340681853,
+            0.15009274679193627
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9972731107538,
+          "yaw_unwrapped_displacement": 0.0027268892462188887
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9706961876991942,
+        "actuator_saturation_window": {
+          "avg": 0.9500663848856504,
+          "max": 0.9942431130808316,
+          "min": 0.9127103481029862
+        },
+        "body_height_m": {
+          "avg": 0.1500680309071342,
+          "max": 0.15012440011088243,
+          "min": 0.1500229191651394
+        },
+        "command_latency_sec": {
+          "avg": 2.0049357917159796,
+          "max": 2.006889875046909,
+          "min": 2.0030132920946926
+        },
+        "contact_duty_factor": {
+          "both": 0.930628272251309,
+          "left": 0.9777486910994765,
+          "right": 0.9526178010471205
+        },
+        "correction_rate": {
+          "avg": 63.48118782737036,
+          "max": 96.69384187442631,
+          "min": 49.42087172603294
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.2721244273173224,
+          "max": 0.2726534109419778,
+          "min": 0.27158662079544427
+        },
+        "lateral_displacement": {
+          "avg": 0.0007412332049852841,
+          "max": 0.0007556582135511338,
+          "min": 0.0007185794786780547
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 2.08448914758973,
+          "max": 4.0129083683315505,
+          "min": -2.5712981899164284
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.013296972868246604,
+        "qpos_z_correction_magnitude_sum": 0.32867950206344687,
+        "qpos_z_forcing_count": 3820,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.14999998456292887,
+        "qvel_xy_forcing_count": 3820,
+        "roll_deg": {
+          "avg": 0.167059474270147,
+          "max": 1.0915681894463993,
+          "min": -0.42745251657598216
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -359.99734130630844,
+          "max": -359.9972731107538,
+          "min": -359.997406278286
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": 0.0026586936915767487,
+          "max": 0.0027268892462188887,
+          "min": 0.002593721713992636
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_1_0_z_0_5",
+        "qvel_scale": "1.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "0.5"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.13550596239863733,
+            "y": 0.00047368801483287337
+          },
+          "actuator_saturation": 0.9653316053430846,
+          "actuator_saturation_window": {
+            "avg": 0.9486896540110473,
+            "max": 0.9944395569104603,
+            "min": 0.9128097273554099
+          },
+          "body_height_m": {
+            "avg": 0.1501381308129838,
+            "max": 0.1502355293655608,
+            "min": 0.1500427903158998
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0095927082002163,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9392302498311952,
+            "left": 0.9804186360567184,
+            "right": 0.9581363943281567
+          },
+          "correction_magnitude_max": 0.4299097447568537,
+          "correction_magnitude_sum": 156.34690228981805,
+          "correction_rate": {
+            "avg": 63.474272953134964,
+            "max": 96.35854459349012,
+            "min": 50.74495371468359
+          },
+          "end_position": [
+            0.2663771208206441,
+            -0.0006492059839005284,
+            0.15014403326376013
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2723117939539543,
+          "lateral_displacement": 0.0009519199805699783,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.081654344689101,
+            "max": 4.0131080075333765,
+            "min": -2.4741249165710015
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.13468155046562713,
+          "qpos_z_forcing_count": 1481,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.000179666792973876,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.012635542079806328,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998687848953,
+          "qvel_xy_forcing_count": 1481,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": 0.2699939949346962,
+            "max": 1.3013352657441324,
+            "min": -0.3734843682433741
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.2555361440436937,
+              "min": -0.005934673133310203
+            },
+            "y": {
+              "max": 0.00023289463773223834,
+              "min": -0.0035757804642048098
+            },
+            "yaw": {
+              "max": 359.99920889767327,
+              "min": 0.0001382183133292342
+            }
+          },
+          "start_position": [
+            -0.005934673133310203,
+            -0.0016011259644705066,
+            0.15018110607620072
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.99759805814404,
+          "yaw_unwrapped_displacement": 0.002401941855964651
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13447339830709246,
+            "y": 0.0003862121590809782
+          },
+          "actuator_saturation": 0.9761245184875572,
+          "actuator_saturation_window": {
+            "avg": 0.949461725313902,
+            "max": 0.9964181488765267,
+            "min": 0.9160660579877088
+          },
+          "body_height_m": {
+            "avg": 0.1501365019792246,
+            "max": 0.1502375609364965,
+            "min": 0.1500430184196656
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0040894171688706,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9357277882797732,
+            "left": 0.9784499054820416,
+            "right": 0.9568998109640832
+          },
+          "correction_magnitude_max": 0.4299097447568537,
+          "correction_magnitude_sum": 291.34274437807744,
+          "correction_rate": {
+            "avg": 62.597823842473225,
+            "max": 93.79688464332503,
+            "min": 49.42130318439126
+          },
+          "end_position": [
+            0.26339379040411465,
+            -0.00047131122825916924,
+            0.1501211305181969
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2694967144379783,
+          "lateral_displacement": 0.0007740037007961287,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.0224803276839145,
+            "max": 4.015109857105884,
+            "min": -2.5615148291919208
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.2307166731693187,
+          "qpos_z_forcing_count": 2645,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.0001284580212086439,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.0011957918759435415,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998183873986,
+          "qvel_xy_forcing_count": 2645,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": 0.17212814599643017,
+            "max": 1.1206424855733919,
+            "min": -0.4278907319399081
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.95,
+            "left": 1.0,
+            "right": 0.95
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.24948400314866215,
+              "min": -0.006102924033863661
+            },
+            "y": {
+              "max": 0.00044428176651564857,
+              "min": -0.0032381126256728634
+            },
+            "yaw": {
+              "max": 359.9988894392172,
+              "min": 0.00014884136803470791
+            }
+          },
+          "start_position": [
+            -0.006102924033863661,
+            -0.001245314929055298,
+            0.15018368387493283
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9983060611855,
+          "yaw_unwrapped_displacement": 0.0016939388145260637
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13489800770907442,
+            "y": 0.0003475084080463512
+          },
+          "actuator_saturation": 0.9706037145269313,
+          "actuator_saturation_window": {
+            "avg": 0.9501972494128731,
+            "max": 0.9943793753547733,
+            "min": 0.912721162569172
+          },
+          "body_height_m": {
+            "avg": 0.15013548069117091,
+            "max": 0.15023818503354,
+            "min": 0.150044549690562
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0154710840433836,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.9295627127520293,
+            "left": 0.9777428646242472,
+            "right": 0.9515579994763027
+          },
+          "correction_magnitude_max": 0.4299097447568537,
+          "correction_magnitude_sum": 429.18208800401834,
+          "correction_rate": {
+            "avg": 63.431836160107494,
+            "max": 96.01230718278089,
+            "min": 48.971904508802595
+          },
+          "end_position": [
+            0.2657649653985553,
+            -0.0004998267569558376,
+            0.15013976518635386
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.27188303383270096,
+          "lateral_displacement": 0.00070039314787937,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 2.057421286785859,
+            "max": 4.012953084193215,
+            "min": -2.578132791800941
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.006648486434123302,
+          "qpos_z_correction_magnitude_sum": 0.3262472546743448,
+          "qpos_z_forcing_count": 3819,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.0001669169869273901,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0009758749511092901,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 3819,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": 0.17675942212379486,
+            "max": 1.11893438734471,
+            "min": -0.4206848709174154
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.9,
+            "left": 1.0,
+            "right": 0.9
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.252463556974828,
+              "min": -0.006118068434145655
+            },
+            "y": {
+              "max": 0.0004525995513455547,
+              "min": -0.0032337637742819313
+            },
+            "yaw": {
+              "max": 359.9992969250364,
+              "min": 0.0004793809286145019
+            }
+          },
+          "start_position": [
+            -0.006118068434145655,
+            -0.0012002199048352076,
+            0.1501834799643777
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9964010678782,
+          "yaw_unwrapped_displacement": 0.003598932121803955
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9706037145269313,
+        "actuator_saturation_window": {
+          "avg": 0.9501972494128731,
+          "max": 0.9943793753547733,
+          "min": 0.912721162569172
+        },
+        "body_height_m": {
+          "avg": 0.15013548069117091,
+          "max": 0.15023818503354,
+          "min": 0.150044549690562
+        },
+        "command_latency_sec": {
+          "avg": 2.0097177364708236,
+          "max": 2.0154710840433836,
+          "min": 2.0040894171688706
+        },
+        "contact_duty_factor": {
+          "both": 0.9295627127520293,
+          "left": 0.9777428646242472,
+          "right": 0.9515579994763027
+        },
+        "correction_rate": {
+          "avg": 63.431836160107494,
+          "max": 96.01230718278089,
+          "min": 48.971904508802595
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.27123051407487786,
+          "max": 0.2723117939539543,
+          "min": 0.2694967144379783
+        },
+        "lateral_displacement": {
+          "avg": 0.000808772276415159,
+          "max": 0.0009519199805699783,
+          "min": 0.00070039314787937
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 2.057421286785859,
+          "max": 4.012953084193215,
+          "min": -2.578132791800941
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.006648486434123302,
+        "qpos_z_correction_magnitude_sum": 0.3262472546743448,
+        "qpos_z_forcing_count": 3819,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.14999998456292887,
+        "qvel_xy_forcing_count": 3819,
+        "roll_deg": {
+          "avg": 0.17675942212379486,
+          "max": 1.11893438734471,
+          "min": -0.4206848709174154
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -359.99743506240253,
+          "max": -359.9964010678782,
+          "min": -359.9983060611855
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": 0.0025649375974315567,
+          "max": 0.003598932121803955,
+          "min": 0.0016939388145260637
+        }
+      }
+    },
+    {
+      "case": {
+        "duration_sec": 2.0,
+        "dynamics_mode": "hybrid",
+        "name": "hybrid_qvel_1_0_z_0_0",
+        "qvel_scale": "1.0",
+        "repeats": 3,
+        "speed": 0.25,
+        "z_force_scale": "0.0"
+      },
+      "repeats": [
+        {
+          "actual_base_velocity": {
+            "x": 0.13920096031487847,
+            "y": 7.778939674338203e-05
+          },
+          "actuator_saturation": 0.97205717878231,
+          "actuator_saturation_window": {
+            "avg": 0.9534278738693208,
+            "max": 0.9883083617110074,
+            "min": 0.9196846542644862
+          },
+          "body_height_m": {
+            "avg": 0.1658514885778643,
+            "max": 0.17189526504060232,
+            "min": 0.15818845449955968
+          },
+          "command_error": null,
+          "command_latency_sec": 2.003049333114177,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.325452016689847,
+            "left": 0.5083449235048678,
+            "right": 0.8164116828929068
+          },
+          "correction_magnitude_max": 0.42190069707670264,
+          "correction_magnitude_sum": 109.6901177458934,
+          "correction_rate": {
+            "avg": 41.42852800118318,
+            "max": 75.46826506772369,
+            "min": 26.198882101132455
+          },
+          "end_position": [
+            0.27191105999771675,
+            0.00011096447185293464,
+            0.16207469034917046
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2788263907275703,
+          "lateral_displacement": 0.0001558159992701855,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.22849113327998077,
+            "max": 2.572355366090298,
+            "min": -2.932532452563538
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 3,
+              "failed": 0,
+              "last_latency_sec": 0.00014083320274949074,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 1,
+              "failed": 0,
+              "last_latency_sec": 0.0061292501632124186,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 1438,
+          "repeat": 1,
+          "roll_deg": {
+            "avg": -0.9342023242822434,
+            "max": -0.36636819262308357,
+            "min": -1.575001769650519
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.3,
+            "left": 0.55,
+            "right": 0.75
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.25835608126200577,
+              "min": -0.0069153307298535395
+            },
+            "y": {
+              "max": 0.0010822071826203934,
+              "min": -4.485152741725083e-05
+            },
+            "yaw": {
+              "max": 359.9989621967421,
+              "min": 0.00016105733719224219
+            }
+          },
+          "start_position": [
+            -0.0069153307298535395,
+            -4.485152741725083e-05,
+            0.1704046239146853
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.99336302070765,
+          "yaw_unwrapped_displacement": 0.006636979292352407
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13821649711550482,
+            "y": -2.1312362977990596e-05
+          },
+          "actuator_saturation": 0.9812366494628441,
+          "actuator_saturation_window": {
+            "avg": 0.9528826805806713,
+            "max": 0.9859141906794411,
+            "min": 0.9154189355093455
+          },
+          "body_height_m": {
+            "avg": 0.16587986132837632,
+            "max": 0.171511802810815,
+            "min": 0.15851645715002233
+          },
+          "command_error": null,
+          "command_latency_sec": 2.0034628328867257,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.32629558541266795,
+            "left": 0.5378119001919386,
+            "right": 0.7880998080614203
+          },
+          "correction_magnitude_max": 0.42190069707670264,
+          "correction_magnitude_sum": 201.6719657608084,
+          "correction_rate": {
+            "avg": 41.285607839732215,
+            "max": 71.42363253657095,
+            "min": 23.690641819674738
+          },
+          "end_position": [
+            0.26986315273937334,
+            -5.3450482492079634e-05,
+            0.16070937864634616
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2769116148627092,
+          "lateral_displacement": -4.269852710739521e-05,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.18727629125892287,
+            "max": 2.578332158818849,
+            "min": -2.88790068460035
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 6,
+              "failed": 0,
+              "last_latency_sec": 0.00012387498281896114,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 4,
+              "failed": 0,
+              "last_latency_sec": 0.001122708898037672,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998183873986,
+          "qvel_xy_forcing_count": 2605,
+          "repeat": 2,
+          "roll_deg": {
+            "avg": -0.8193141596323532,
+            "max": -0.15419542404485323,
+            "min": -1.5601970049719256
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.35,
+            "left": 0.55,
+            "right": 0.8
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.2553893896800274,
+              "min": -0.0070290542333808475
+            },
+            "y": {
+              "max": 0.0009773451207255553,
+              "min": -0.00028664135552510027
+            },
+            "yaw": {
+              "max": 359.99958350674575,
+              "min": 0.0008232648423302368
+            }
+          },
+          "start_position": [
+            -0.007048462123335888,
+            -1.0751955384684424e-05,
+            0.1667441809588513
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.991502187454,
+          "yaw_unwrapped_displacement": 0.008497812546011119
+        },
+        {
+          "actual_base_velocity": {
+            "x": 0.13880497404001668,
+            "y": -7.030611440328693e-05
+          },
+          "actuator_saturation": 0.9721068494357742,
+          "actuator_saturation_window": {
+            "avg": 0.9533593120509772,
+            "max": 0.9909166591730538,
+            "min": 0.9154385912759571
+          },
+          "body_height_m": {
+            "avg": 0.16568838118144563,
+            "max": 0.17143653775240875,
+            "min": 0.15818278087611481
+          },
+          "command_error": null,
+          "command_latency_sec": 2.003841708879918,
+          "command_status_code": 200,
+          "contact_duty_factor": {
+            "both": 0.3210596026490066,
+            "left": 0.5494039735099338,
+            "right": 0.7713907284768212
+          },
+          "correction_magnitude_max": 0.42190069707670264,
+          "correction_magnitude_sum": 294.67816218714125,
+          "correction_rate": {
+            "avg": 41.589452111125375,
+            "max": 68.76812333217856,
+            "min": 25.511998689096345
+          },
+          "end_position": [
+            0.2711918132942006,
+            -0.00017353140881842238,
+            0.1614113377568795
+          ],
+          "fall_event_timestamp": null,
+          "fall_reason": null,
+          "forward_displacement": 0.2781431963813797,
+          "lateral_displacement": -0.0001408823244305895,
+          "no_contact_duration_sec": 0.0,
+          "pitch_deg": {
+            "avg": 0.15838492616706923,
+            "max": 2.4999569570093665,
+            "min": -2.921431233924203
+          },
+          "qpos_xy_integration_count": 0,
+          "qpos_z_correction_magnitude_max": 0.0,
+          "qpos_z_correction_magnitude_sum": 0.0,
+          "qpos_z_forcing_count": 0,
+          "queue_stability": {
+            "after": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 9,
+              "failed": 0,
+              "last_latency_sec": 0.00011479086242616177,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "before": {
+              "active_command": null,
+              "active_request_id": null,
+              "cancelled": 0,
+              "completed": 7,
+              "failed": 0,
+              "last_latency_sec": 0.0009886249899864197,
+              "max_queue_size": 50,
+              "queue_size": 0,
+              "rejected": 0,
+              "running": true
+            },
+            "stable": true
+          },
+          "qvel_xy_commanded_magnitude": 0.14999998456292887,
+          "qvel_xy_forcing_count": 3775,
+          "repeat": 3,
+          "roll_deg": {
+            "avg": -0.7774147087252966,
+            "max": -0.045476801877903976,
+            "min": -1.5296261244855764
+          },
+          "safety_event_timestamp": null,
+          "safety_intervention_count": 0,
+          "sampled_contact_ratio": {
+            "both": 0.3,
+            "left": 0.55,
+            "right": 0.75
+          },
+          "sampled_position_range": {
+            "x": {
+              "max": 0.2585334915318102,
+              "min": -0.006951383087179067
+            },
+            "y": {
+              "max": 0.0008706866192925781,
+              "min": -0.00029018678639796183
+            },
+            "yaw": {
+              "max": 359.9996260115806,
+              "min": 0.0016088977810921595
+            }
+          },
+          "start_position": [
+            -0.006951383087179067,
+            -3.264908438783289e-05,
+            0.16704318839840704
+          ],
+          "telemetry_publication": {
+            "errors": 0,
+            "samples": 20,
+            "stable": true
+          },
+          "yaw_displacement": -359.9904117533402,
+          "yaw_unwrapped_displacement": 0.009588246659802735
+        }
+      ],
+      "summary": {
+        "actuator_saturation": 0.9721068494357742,
+        "actuator_saturation_window": {
+          "avg": 0.9533593120509772,
+          "max": 0.9909166591730538,
+          "min": 0.9154385912759571
+        },
+        "body_height_m": {
+          "avg": 0.16568838118144563,
+          "max": 0.17143653775240875,
+          "min": 0.15818278087611481
+        },
+        "command_latency_sec": {
+          "avg": 2.00345129162694,
+          "max": 2.003841708879918,
+          "min": 2.003049333114177
+        },
+        "contact_duty_factor": {
+          "both": 0.3210596026490066,
+          "left": 0.5494039735099338,
+          "right": 0.7713907284768212
+        },
+        "correction_rate": {
+          "avg": 41.589452111125375,
+          "max": 68.76812333217856,
+          "min": 25.511998689096345
+        },
+        "fall_event_count": 0,
+        "fall_reason": null,
+        "forward_displacement": {
+          "avg": 0.2779604006572198,
+          "max": 0.2788263907275703,
+          "min": 0.2769116148627092
+        },
+        "lateral_displacement": {
+          "avg": -9.25495075593307e-06,
+          "max": 0.0001558159992701855,
+          "min": -0.0001408823244305895
+        },
+        "movement_detected": true,
+        "no_contact_duration_sec": {
+          "avg": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "pitch_deg": {
+          "avg": 0.15838492616706923,
+          "max": 2.4999569570093665,
+          "min": -2.921431233924203
+        },
+        "qpos_xy_integration_count": 0,
+        "qpos_z_correction_magnitude_max": 0.0,
+        "qpos_z_correction_magnitude_sum": 0.0,
+        "qpos_z_forcing_count": 0,
+        "queue_stable": true,
+        "qvel_xy_commanded_magnitude": 0.14999998456292887,
+        "qvel_xy_forcing_count": 3775,
+        "roll_deg": {
+          "avg": -0.7774147087252966,
+          "max": -0.045476801877903976,
+          "min": -1.5296261244855764
+        },
+        "safety_interventions": 0,
+        "telemetry_stable": true,
+        "yaw_displacement": {
+          "avg": -359.99175898716726,
+          "max": -359.9904117533402,
+          "min": -359.99336302070765
+        },
+        "yaw_unwrapped_displacement": {
+          "avg": 0.008241012832722086,
+          "max": 0.009588246659802735,
+          "min": 0.006636979292352407
+        }
+      }
+    }
+  ]
+}
