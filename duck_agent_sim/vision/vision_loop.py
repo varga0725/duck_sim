@@ -64,6 +64,19 @@ class VisionLoop:
                         # 5. Update thread-safe shared state
                         h, w, _ = latest_frame.shape
                         self.state.update(detections, width=w, height=h)
+
+                        # 6. Update Spatial World Model
+                        sim = self.camera_device.simulator
+                        if hasattr(sim, "spatial_model") and sim.spatial_model is not None:
+                            state = sim.get_state()
+                            sim.spatial_model.update(
+                                robot_x=state.position[0],
+                                robot_y=state.position[1],
+                                robot_yaw_deg=state.orientation.yaw_deg,
+                                detections=detections,
+                                img_w=w,
+                                img_h=h
+                            )
             except Exception as e:
                 logger.error(f"Error in background vision loop: {e}", exc_info=True)
                 

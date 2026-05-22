@@ -48,7 +48,7 @@ def test_resolve_device():
     assert controller.resolve_device("3") == 3
     
     # Test name match with mock list
-    with patch("speech_recognition.Microphone.list_microphone_names", return_value=["Default", "iPhone Microphone", "External Mic"]):
+    with patch("duck_agent_sim.agent.voice_control.sr.Microphone.list_microphone_names", return_value=["Default", "iPhone Microphone", "External Mic"]):
         assert controller.resolve_device("iPhone") == 1
         assert controller.resolve_device("External") == 2
         assert controller.resolve_device("Nonexistent") is None

@@ -406,3 +406,26 @@ def get_follow_status():
     Returns the telemetry and control loop status of the target follower.
     """
     return follower.get_status()
+
+
+@router.get("/map")
+def get_map():
+    """
+    Returns the 2D occupancy grid matrix and semantic landmarks from the spatial world model.
+    """
+    if hasattr(active_simulator, "spatial_model") and active_simulator.spatial_model is not None:
+        return active_simulator.spatial_model.get_map_data()
+    else:
+        raise HTTPException(status_code=501, detail="Spatial world model not initialized on active simulator")
+
+
+@router.post("/map/reset")
+def post_map_reset():
+    """
+    Resets the 2D occupancy grid and landmark memory.
+    """
+    if hasattr(active_simulator, "spatial_model") and active_simulator.spatial_model is not None:
+        active_simulator.spatial_model.reset()
+        return {"status": "success", "message": "Map and landmarks reset successfully"}
+    else:
+        raise HTTPException(status_code=501, detail="Spatial world model not initialized on active simulator")

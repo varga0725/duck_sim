@@ -186,6 +186,18 @@ class HermesRobotClient:
         r.raise_for_status()
         return r.json()
 
+    async def get_map(self) -> Dict[str, Any]:
+        """Retrieves the 2D occupancy grid matrix and semantic landmarks from the simulator."""
+        r = await self.http_client.get("/map")
+        r.raise_for_status()
+        return r.json()
+
+    async def reset_map(self) -> Dict[str, Any]:
+        """Resets the 2D occupancy grid and landmark memory."""
+        r = await self.http_client.post("/map/reset")
+        r.raise_for_status()
+        return r.json()
+
     # ----------------------------------------------------
     # WebSocket Real-Time Telemetry Stream
     # ----------------------------------------------------

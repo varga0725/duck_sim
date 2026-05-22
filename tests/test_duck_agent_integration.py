@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from duck_agent_sim.agent.duck_agent import DuckAgent
-from duck_agent_sim.schemas import RobotState, CommandResponse, ControlIntent
+from duck_agent_sim.schemas import RobotState, CommandResponse, ControlIntent, Orientation
 
 
 def _mock_robot_state(**overrides) -> RobotState:
@@ -54,6 +54,36 @@ def agent():
     )
     a.direct.client.stop_following = AsyncMock(
         return_value={"status": "stopped"}
+    )
+
+    # Mock the local agent client (used for A2A and local navigation checks)
+    from duck_agent_sim.schemas import SensorsState, SensorAvailability
+    a._agent.client.get_state = AsyncMock(
+        return_value=_mock_robot_state(status="idle")
+    )
+    a._agent.client.get_sensors_state = AsyncMock(
+        return_value=SensorsState(
+            mode="mock",
+            sim_time=0.0,
+            timestamp=0.0,
+            imu=SensorAvailability(available=False),
+            feet={
+                "left": SensorAvailability(available=False),
+                "right": SensorAvailability(available=False),
+            },
+        )
+    )
+    a._agent.client.get_map = AsyncMock(
+        return_value={"grid": [[0]*80]*80, "resolution": 0.1, "grid_size": 80, "landmarks": {}}
+    )
+    a._agent.client.send_command = AsyncMock(
+        return_value=_mock_command_response("walk_forward")
+    )
+    a._agent.client.reset = AsyncMock(
+        return_value=_mock_robot_state(status="idle")
+    )
+    a._agent.client.stop = AsyncMock(
+        return_value=_mock_robot_state(status="stopped")
     )
     return a
 
@@ -127,7 +157,10 @@ class TestHermesRouting:
         )
         resp = await agent.process("mit látsz?")
         assert resp.source == "hermes"
-        agent.hermes.delegate.assert_awaited_once_with("mit látsz?")
+        agent.hermes.delegate.assert_awaited_once()
+        called_arg = agent.hermes.delegate.call_args[0][0]
+        assert "A2A_PROTOCOL_REQUEST" in called_arg
+        assert "mit látsz?" in called_arg
 
     @pytest.mark.asyncio
     async def test_unknown_routes_hermes(self, agent):
@@ -143,6 +176,10 @@ class TestHermesRouting:
         )
         resp = await agent.process("zsiráf pingvin delfin")
         assert resp.source == "hermes"
+        agent.hermes.delegate.assert_awaited_once()
+        called_arg = agent.hermes.delegate.call_args[0][0]
+        assert "A2A_PROTOCOL_REQUEST" in called_arg
+        assert "zsiráf pingvin delfin" in called_arg
 
 
 class TestProcessWithIntent:
@@ -184,3 +221,96 @@ class TestSpeechOutput:
             resp = await agent.process(text)
             assert resp.speech is not None
             assert len(resp.speech) > 0
+
+
+class TestLocalNavigationHeuristics:
+    """Tests the local navigation heuristics of LocalDuckAgent when a landmark is known."""
+
+    @pytest.mark.asyncio
+    async def test_navigate_to_known_landmark_turn(self, agent):
+        # Landmark is chair at (2.0, 2.0). Robot is at (0.0, 0.0) with yaw = 0.
+        # Yaw diff is 45 degrees, which is > 15 deg. Should turn left.
+        agent._agent.client.get_map = AsyncMock(
+            return_value={
+                "grid": [[0]*80]*80,
+                "resolution": 0.1,
+                "grid_size": 80,
+                "landmarks": {
+                    "chair": {"x": 2.0, "y": 2.0, "confidence": 0.9}
+                }
+            }
+        )
+        agent._agent.client.get_state = AsyncMock(
+            return_value=_mock_robot_state(position=(0.0, 0.0, 0.41), orientation=Orientation(yaw_deg=0.0))
+        )
+        agent._agent.client.send_command = AsyncMock(
+            return_value=_mock_command_response("turn_left")
+        )
+        
+        resp = await agent.process("kövesd a széket")
+        assert resp.source == "direct"
+        assert resp.action == "turn_left"
+        assert "Fordulok a chair felé" in resp.speech
+        agent._agent.client.send_command.assert_called_once()
+        kwargs = agent._agent.client.send_command.call_args[1]
+        assert kwargs["command"] == "turn_left"
+        assert kwargs["speed"] == 0.0
+        assert kwargs["turn"] == 0.4
+        assert abs(kwargs["duration_sec"] - 1.0) < 1e-5
+
+    @pytest.mark.asyncio
+    async def test_navigate_to_known_landmark_walk(self, agent):
+        # Landmark is chair at (2.0, 0.0). Robot is at (0.0, 0.0) with yaw = 0.
+        # Yaw diff is 0. Should walk forward.
+        agent._agent.client.get_map = AsyncMock(
+            return_value={
+                "grid": [[0]*80]*80,
+                "resolution": 0.1,
+                "grid_size": 80,
+                "landmarks": {
+                    "chair": {"x": 2.0, "y": 0.0, "confidence": 0.9}
+                }
+            }
+        )
+        agent._agent.client.get_state = AsyncMock(
+            return_value=_mock_robot_state(position=(0.0, 0.0, 0.41), orientation=Orientation(yaw_deg=0.0))
+        )
+        agent._agent.client.send_command = AsyncMock(
+            return_value=_mock_command_response("walk_forward")
+        )
+        
+        resp = await agent.process("menj a székhez")
+        assert resp.source == "direct"
+        assert resp.action == "walk_forward"
+        assert "Közeledem a chair-hoz" in resp.speech
+        agent._agent.client.send_command.assert_called_once()
+        kwargs = agent._agent.client.send_command.call_args[1]
+        assert kwargs["command"] == "walk_forward"
+        assert kwargs["speed"] == 0.3
+        assert kwargs["turn"] == 0.0
+        assert abs(kwargs["duration_sec"] - 2.0) < 1e-5
+
+    @pytest.mark.asyncio
+    async def test_navigate_to_known_landmark_stop(self, agent):
+        # Landmark is chair at (0.2, 0.0). Robot is at (0.0, 0.0) with yaw = 0.
+        # Distance is 0.2m (< 0.3m). Should stop.
+        agent._agent.client.get_map = AsyncMock(
+            return_value={
+                "grid": [[0]*80]*80,
+                "resolution": 0.1,
+                "grid_size": 80,
+                "landmarks": {
+                    "chair": {"x": 0.2, "y": 0.0, "confidence": 0.9}
+                }
+            }
+        )
+        agent._agent.client.get_state = AsyncMock(
+            return_value=_mock_robot_state(position=(0.0, 0.0, 0.41), orientation=Orientation(yaw_deg=0.0))
+        )
+        
+        resp = await agent.process("menj a székhez")
+        assert resp.source == "direct"
+        assert resp.action == "stop"
+        assert "Megérkeztem a chair közelébe" in resp.speech
+        agent._agent.client.stop.assert_called_once()
+

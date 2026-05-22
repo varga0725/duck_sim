@@ -16,6 +16,7 @@ from duck_agent_sim.simulator.double_buffered_state import DoubleBufferedState
 from duck_agent_sim.simulator.control_plane import DesiredMotionState, ZERO_CONTROL, command_duration
 from duck_agent_sim.simulator.timing import SimulationClock
 from duck_agent_sim.simulator.legacy_dynamics import LegacyDynamicsController
+from duck_agent_sim.simulator.spatial_world_model import SpatialWorldModel
 
 logger = logging.getLogger("duck-agent-sim")
 
@@ -173,6 +174,7 @@ class MockDuckSimulator(DuckSimulator):
         self._running = True
         self._clock = SimulationClock("mock-physics", fixed_dt_sec=0.05)
         self._thread = threading.Thread(target=self._simulation_loop, daemon=True, name="MockDuckSimulationLoop")
+        self.spatial_model = SpatialWorldModel()
         self.reset()
         self._thread.start()
         
@@ -232,6 +234,8 @@ class MockDuckSimulator(DuckSimulator):
         )
         self._double_buffered_state.update_write_state(self._state)
         self._double_buffered_state.swap()
+        if hasattr(self, "spatial_model"):
+            self.spatial_model.reset()
         return self.get_state()
 
     def stop(self) -> RobotState:
@@ -673,6 +677,7 @@ class RealDuckSimulator(DuckSimulator):
         self.imitation_i = 0.0
         self.imitation_phase = np.array([1.0, 0.0])
         self.nb_steps_in_period = 50
+        self.spatial_model = SpatialWorldModel()
 
     def _initialize_mujoco(self):
         if self._initialized:
@@ -1182,6 +1187,8 @@ class RealDuckSimulator(DuckSimulator):
                 last_command="reset"
             )
             self._update_shared_state(last_command="reset")
+            if hasattr(self, "spatial_model"):
+                self.spatial_model.reset()
         return self.get_state()
 
     def stop(self) -> RobotState:
