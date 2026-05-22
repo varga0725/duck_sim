@@ -62,6 +62,13 @@ PHASE2G_MATRIX = (
     DiagnosticCase("hybrid_qvel_0_0_z_0_5_rp_0_5_torso_0_0", "hybrid", 0.0, 0.5, 0.5, 0.0),
 )
 
+PHASE2H_MATRIX = (
+    DiagnosticCase("legacy", "legacy", None, None, None, None),
+    DiagnosticCase("hybrid_conservative_qvel_0_0_z_1_0_rp_1_0_torso_1_0", "hybrid", 0.0, 1.0, 1.0, 1.0),
+    DiagnosticCase("hybrid_reduced_qvel_0_0_z_0_5_rp_0_5_torso_0_5", "hybrid", 0.0, 0.5, 0.5, 0.5),
+    DiagnosticCase("hybrid_stress_qvel_0_0_z_0_5_rp_0_0_torso_0_0", "hybrid", 0.0, 0.5, 0.0, 0.0),
+)
+
 
 def _avg(values: list[float]) -> float | None:
     return statistics.fmean(values) if values else None
@@ -119,6 +126,7 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
         "torso_orientation_scale": os.environ.get("DUCK_HYBRID_TORSO_ORIENTATION_SCALE"),
         "repeats": args.repeats,
         "duration_sec": args.duration_sec,
+        "stop_recovery_sec": args.stop_recovery_sec,
         "speed": args.speed,
     }
     repeats: list[dict[str, Any]] = []
@@ -189,6 +197,29 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                 command_error = "command_thread_timeout"
             stop = client.post("/stop")
             stop.raise_for_status()
+
+            recovery_samples: list[dict[str, Any]] = []
+            recovery_errors = 0
+            recovery_deadline = time.monotonic() + args.stop_recovery_sec
+            while time.monotonic() < recovery_deadline:
+                try:
+                    recovery_response = client.get("/state")
+                    recovery_response.raise_for_status()
+                    recovery_state = recovery_response.json()
+                    recovery_samples.append(
+                        {
+                            "t": time.monotonic(),
+                            "position": recovery_state["position"],
+                            "orientation": recovery_state["orientation"],
+                            "feet_contact": recovery_state["feet_contact"],
+                            "fallen": recovery_state["fallen"],
+                            "dynamics": _latest_dynamics(sim),
+                        }
+                    )
+                except Exception:
+                    recovery_errors += 1
+                time.sleep(args.sample_period_sec)
+
             queue_after = _queue_telemetry()
 
             end_state = client.get("/state")
@@ -207,6 +238,12 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
             right_contacts = [bool(sample["feet_contact"]["right"]) for sample in samples]
             dynamics_samples = [sample["dynamics"] for sample in samples if sample["dynamics"]]
             latest_dynamics = dynamics_samples[-1] if dynamics_samples else _latest_dynamics(sim)
+            recovery_rolls = [float(sample["orientation"]["roll_deg"]) for sample in recovery_samples]
+            recovery_pitches = [float(sample["orientation"]["pitch_deg"]) for sample in recovery_samples]
+            recovery_heights = [float(sample["position"][2]) for sample in recovery_samples]
+            recovery_falls = [bool(sample["fallen"]) for sample in recovery_samples]
+            recovery_left_contacts = [bool(sample["feet_contact"]["left"]) for sample in recovery_samples]
+            recovery_right_contacts = [bool(sample["feet_contact"]["right"]) for sample in recovery_samples]
 
             elapsed = max(float(command_result.get("latency_sec") or args.duration_sec), 1e-9)
             forward_displacement = float(end_pos[0]) - float(start_pos[0])
@@ -276,6 +313,11 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                     "roll_deg": _stats(rolls),
                     "pitch_deg": _stats(pitches),
                     "body_height_m": _stats(heights),
+                    "drift": {
+                        "roll_deg": _unwrap_delta_deg(rolls[0], rolls[-1]) if len(rolls) >= 2 else 0.0,
+                        "pitch_deg": (pitches[-1] - pitches[0]) if len(pitches) >= 2 else 0.0,
+                        "body_height_m": (heights[-1] - heights[0]) if len(heights) >= 2 else 0.0,
+                    },
                     "correction_magnitude_sum": latest_dynamics.get("correction_magnitude_sum"),
                     "correction_magnitude_max": latest_dynamics.get("correction_magnitude_max"),
                     "correction_rate": _stats(correction_rates),
@@ -297,6 +339,37 @@ def _run_child(args: argparse.Namespace) -> dict[str, Any]:
                         "samples": len(samples),
                         "errors": sample_errors,
                         "stable": len(samples) > 0 and sample_errors == 0,
+                    },
+                    "stop_recovery": {
+                        "duration_sec": args.stop_recovery_sec,
+                        "samples": len(recovery_samples),
+                        "errors": recovery_errors,
+                        "stable": (
+                            args.stop_recovery_sec <= 0.0
+                            or (
+                                len(recovery_samples) > 0
+                                and recovery_errors == 0
+                                and not any(recovery_falls)
+                                and queue_after.get("active_command") is None
+                                and queue_after.get("queue_size", 0) == 0
+                            )
+                        ),
+                        "fall_event_count": sum(int(fallen) for fallen in recovery_falls),
+                        "roll_deg": _stats(recovery_rolls),
+                        "pitch_deg": _stats(recovery_pitches),
+                        "body_height_m": _stats(recovery_heights),
+                        "contact_ratio": {
+                            "left": sum(recovery_left_contacts) / len(recovery_left_contacts)
+                            if recovery_left_contacts
+                            else 0.0,
+                            "right": sum(recovery_right_contacts) / len(recovery_right_contacts)
+                            if recovery_right_contacts
+                            else 0.0,
+                            "both": sum(l and r for l, r in zip(recovery_left_contacts, recovery_right_contacts))
+                            / len(recovery_left_contacts)
+                            if recovery_left_contacts
+                            else 0.0,
+                        },
                     },
                     "sampled_position_range": {
                         "x": {"min": _min(xs), "max": _max(xs)},
@@ -325,6 +398,7 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
 
     summary["queue_stable"] = all(item["queue_stability"]["stable"] for item in repeats)
     summary["telemetry_stable"] = all(item["telemetry_publication"]["stable"] for item in repeats)
+    summary["stop_recovery_stable"] = all(item["stop_recovery"]["stable"] for item in repeats)
     summary["safety_interventions"] = sum(int(item["safety_intervention_count"]) for item in repeats)
     if repeats:
         latest = repeats[-1]
@@ -350,6 +424,21 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
         summary["roll_deg"] = latest.get("roll_deg")
         summary["pitch_deg"] = latest.get("pitch_deg")
         summary["body_height_m"] = latest.get("body_height_m")
+        summary["drift"] = {
+            "roll_deg": _stats([float(item["drift"]["roll_deg"]) for item in repeats]),
+            "pitch_deg": _stats([float(item["drift"]["pitch_deg"]) for item in repeats]),
+            "body_height_m": _stats([float(item["drift"]["body_height_m"]) for item in repeats]),
+        }
+        summary["stop_recovery"] = {
+            "stable": summary["stop_recovery_stable"],
+            "fall_event_count": sum(int(item["stop_recovery"]["fall_event_count"]) for item in repeats),
+            "roll_deg": latest["stop_recovery"].get("roll_deg"),
+            "pitch_deg": latest["stop_recovery"].get("pitch_deg"),
+            "body_height_m": latest["stop_recovery"].get("body_height_m"),
+            "contact_ratio": latest["stop_recovery"].get("contact_ratio"),
+            "samples": sum(int(item["stop_recovery"]["samples"]) for item in repeats),
+            "errors": sum(int(item["stop_recovery"]["errors"]) for item in repeats),
+        }
         summary["correction_rate"] = latest.get("correction_rate")
         summary["fall_reason"] = latest.get("fall_reason")
         summary["fall_event_count"] = sum(1 for item in repeats if item.get("fall_event_timestamp") is not None)
@@ -359,7 +448,9 @@ def _summarize_repeats(repeats: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
     results = []
-    if args.matrix == "phase2g":
+    if args.matrix == "phase2h":
+        matrix = PHASE2H_MATRIX
+    elif args.matrix == "phase2g":
         matrix = PHASE2G_MATRIX
     elif args.matrix == "phase2f":
         matrix = PHASE2F_MATRIX
@@ -406,6 +497,8 @@ def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
             str(args.sample_period_sec),
             "--speed",
             str(args.speed),
+            "--stop-recovery-sec",
+            str(args.stop_recovery_sec),
         ]
         completed = subprocess.run(cmd, cwd=ROOT, env=env, text=True, capture_output=True, check=False)
         if completed.returncode != 0:
@@ -422,6 +515,7 @@ def _run_parent(args: argparse.Namespace) -> dict[str, Any]:
         "profile": {
             "repeats": args.repeats,
             "duration_sec": args.duration_sec,
+            "stop_recovery_sec": args.stop_recovery_sec,
             "stable_wait_sec": args.stable_wait_sec,
             "sample_period_sec": args.sample_period_sec,
             "speed": args.speed,
@@ -442,10 +536,15 @@ def main() -> int:
     parser.add_argument("--case-name", default="manual")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--duration-sec", type=float, default=2.0)
+    parser.add_argument("--stop-recovery-sec", type=float, default=0.0)
     parser.add_argument("--stable-wait-sec", type=float, default=0.25)
     parser.add_argument("--sample-period-sec", type=float, default=0.1)
     parser.add_argument("--speed", type=float, default=0.25)
-    parser.add_argument("--matrix", choices=("phase2d", "phase2e", "phase2f", "phase2g"), default="phase2d")
+    parser.add_argument(
+        "--matrix",
+        choices=("phase2d", "phase2e", "phase2f", "phase2g", "phase2h"),
+        default="phase2d",
+    )
     parser.add_argument("--output", default="docs/phase2d_moving_window_diagnostics_results.json")
     args = parser.parse_args()
 
