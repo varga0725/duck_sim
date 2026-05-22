@@ -24,6 +24,7 @@ class LegacyDynamicsDiagnostics:
     last_pitch_deg: float = 0.0
     last_body_height_m: float = 0.0
     last_actuator_saturation: float = 0.0
+    last_qvel_xy_commanded_magnitude: float = 0.0
     last_fall_reason: str | None = None
 
     def snapshot(self) -> Dict[str, Any]:
@@ -43,6 +44,7 @@ class LegacyDynamicsDiagnostics:
 class LegacyDynamicsController:
     mode: str = "legacy"
     fixed_dt_sec: float = 0.002
+    hybrid_qvel_xy_scale: float = 1.0
     diagnostics: LegacyDynamicsDiagnostics = field(default_factory=LegacyDynamicsDiagnostics)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -84,9 +86,14 @@ class LegacyDynamicsController:
 
         global_vx = simulator._current_linear_x * math.cos(yaw_rad) - simulator._current_linear_y * math.sin(yaw_rad)
         global_vy = simulator._current_linear_x * math.sin(yaw_rad) + simulator._current_linear_y * math.cos(yaw_rad)
+        qvel_xy_scale = self.hybrid_qvel_xy_scale if self.mode == "hybrid" else 1.0
+        applied_vx = global_vx * qvel_xy_scale
+        applied_vy = global_vy * qvel_xy_scale
 
-        simulator.data.qvel[0] = global_vx
-        simulator.data.qvel[1] = global_vy
+        qvel_xy_forced = not (self.mode == "hybrid" and qvel_xy_scale == 0.0)
+        if qvel_xy_forced:
+            simulator.data.qvel[0] = applied_vx
+            simulator.data.qvel[1] = applied_vy
 
         qpos_xy_integrated = self.mode != "hybrid"
         if qpos_xy_integrated:
@@ -101,6 +108,7 @@ class LegacyDynamicsController:
         right_contact = simulator.check_contact("foot_assembly_2", "floor")
         actuator_saturation = self._actuator_saturation(simulator)
         fall_reason = self._fall_reason(roll, pitch, float(simulator.data.qpos[2]))
+        qvel_xy_commanded_magnitude = math.hypot(applied_vx, applied_vy)
 
         self.record(
             before_qpos=before_qpos,
@@ -115,6 +123,8 @@ class LegacyDynamicsController:
             actuator_saturation=actuator_saturation,
             fall_reason=fall_reason,
             qpos_xy_integrated=qpos_xy_integrated,
+            qvel_xy_forced=qvel_xy_forced,
+            qvel_xy_commanded_magnitude=qvel_xy_commanded_magnitude,
         )
 
     def record(
@@ -132,6 +142,8 @@ class LegacyDynamicsController:
         actuator_saturation: float,
         fall_reason: str | None,
         qpos_xy_integrated: bool,
+        qvel_xy_forced: bool,
+        qvel_xy_commanded_magnitude: float,
     ) -> None:
         correction = float(np.linalg.norm(after_qpos - before_qpos) + np.linalg.norm(after_qvel - before_qvel))
         with self._lock:
@@ -139,7 +151,7 @@ class LegacyDynamicsController:
             d.qpos_xy_integration_count += int(qpos_xy_integrated)
             d.qpos_z_forcing_count += 1
             d.torso_quaternion_overwrite_count += 1
-            d.qvel_xy_forcing_count += 1
+            d.qvel_xy_forcing_count += int(qvel_xy_forced)
             d.qvel_roll_pitch_zeroing_count += 1
             d.correction_magnitude_sum += correction
             d.correction_magnitude_max = max(d.correction_magnitude_max, correction)
@@ -151,6 +163,7 @@ class LegacyDynamicsController:
             d.last_pitch_deg = float(pitch_deg)
             d.last_body_height_m = float(body_height_m)
             d.last_actuator_saturation = float(actuator_saturation)
+            d.last_qvel_xy_commanded_magnitude = float(qvel_xy_commanded_magnitude)
             d.last_fall_reason = fall_reason
 
     def snapshot(self) -> Dict[str, Any]:

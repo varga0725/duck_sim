@@ -43,7 +43,7 @@ from duck_agent_sim.simulator.policy_contract import (
     clamp_targets_to_ctrlrange,
 )
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
-from duck_agent_sim.config import DUCK_DYNAMICS_MODE, DUCK_ONNX_MODEL_PATH
+from duck_agent_sim.config import DUCK_DYNAMICS_MODE, DUCK_HYBRID_QVEL_XY_SCALE, DUCK_ONNX_MODEL_PATH
 
 
 
@@ -274,6 +274,7 @@ class MockDuckSimulator(DuckSimulator):
             duration_sec=duration,
             request_id=request_id,
         )
+        scheduled_state = self._advance_from_intent(control, self._clock.fixed_dt_sec, command.safety).model_copy(deep=True)
 
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
@@ -291,7 +292,7 @@ class MockDuckSimulator(DuckSimulator):
             accepted=True,
             command=command.command,
             mapped_control=control,
-            state=self.get_state(),
+            state=self.get_state() if self.get_state().fallen else scheduled_state,
         )
 
     def _simulation_loop(self) -> None:
@@ -606,7 +607,10 @@ class RealDuckSimulator(DuckSimulator):
         self._kinematic_yaw = 0.0
         self._clock = SimulationClock("real-physics", fixed_dt_sec=0.002)
         self._dynamics_mode = DUCK_DYNAMICS_MODE
-        self._legacy_dynamics = LegacyDynamicsController(mode=self._dynamics_mode)
+        self._legacy_dynamics = LegacyDynamicsController(
+            mode=self._dynamics_mode,
+            hybrid_qvel_xy_scale=DUCK_HYBRID_QVEL_XY_SCALE,
+        )
         
         # ONNX Control state variables
         self._onnx_active = False

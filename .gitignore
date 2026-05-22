@@ -19,9 +19,12 @@ Thumbs.db
 # Project-specific temp & run files
 bridge.pid
 *.log
+agentdb.rvf
+agentdb.rvf.lock
 detected_*.png
 fpv_test_frame.png
 projected_frame.png
+ruvector.db
 temp_*.xml
 temp.xml
 
@@ -33,5 +36,4 @@ temp.xml
 *.egg-info/
 dist/
 build/
-
 
