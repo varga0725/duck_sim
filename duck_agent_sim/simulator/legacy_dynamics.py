@@ -88,8 +88,10 @@ class LegacyDynamicsController:
         simulator.data.qvel[0] = global_vx
         simulator.data.qvel[1] = global_vy
 
-        simulator.data.qpos[0] += global_vx * self.fixed_dt_sec
-        simulator.data.qpos[1] += global_vy * self.fixed_dt_sec
+        qpos_xy_integrated = self.mode != "hybrid"
+        if qpos_xy_integrated:
+            simulator.data.qpos[0] += global_vx * self.fixed_dt_sec
+            simulator.data.qpos[1] += global_vy * self.fixed_dt_sec
 
         simulator.data.qvel[3] = 0.0
         simulator.data.qvel[4] = 0.0
@@ -112,6 +114,7 @@ class LegacyDynamicsController:
             right_contact=right_contact,
             actuator_saturation=actuator_saturation,
             fall_reason=fall_reason,
+            qpos_xy_integrated=qpos_xy_integrated,
         )
 
     def record(
@@ -128,11 +131,12 @@ class LegacyDynamicsController:
         right_contact: bool,
         actuator_saturation: float,
         fall_reason: str | None,
+        qpos_xy_integrated: bool,
     ) -> None:
         correction = float(np.linalg.norm(after_qpos - before_qpos) + np.linalg.norm(after_qvel - before_qvel))
         with self._lock:
             d = self.diagnostics
-            d.qpos_xy_integration_count += 1
+            d.qpos_xy_integration_count += int(qpos_xy_integrated)
             d.qpos_z_forcing_count += 1
             d.torso_quaternion_overwrite_count += 1
             d.qvel_xy_forcing_count += 1
