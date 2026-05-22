@@ -68,6 +68,12 @@ DUCK_HYBRID_RP_QVEL_ZERO_SCALE = parse_hybrid_rp_qvel_zero_scale(os.getenv("DUCK
 DUCK_HYBRID_TORSO_ORIENTATION_SCALE = parse_hybrid_torso_orientation_scale(
     os.getenv("DUCK_HYBRID_TORSO_ORIENTATION_SCALE")
 )
+DUCK_POLICY_CONTRACT_WARNINGS = os.getenv("DUCK_POLICY_CONTRACT_WARNINGS", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
 # ONNX model path for real MuJoCo inference
 _default_model = os.path.join(os.path.dirname(__file__), "models", "BEST_WALK_ONNX_2.onnx")

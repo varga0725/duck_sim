@@ -61,6 +61,46 @@ class TestMotorExecution:
         controller.client.send_command.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_motion_intent_params_are_forwarded_to_high_level_command(self, controller):
+        controller.client.send_command = AsyncMock(
+            return_value=_mock_command_response("walk_forward")
+        )
+        intent = Intent(
+            action="walk_forward",
+            route="direct",
+            params={"speed": 0.5, "turn": 0.25, "duration_sec": 2.0},
+            raw_text="move_robot walk_forward",
+        )
+
+        resp = await controller.execute(intent)
+
+        assert resp.success is True
+        controller.client.send_command.assert_awaited_once_with(
+            command="walk_forward",
+            speed=0.5,
+            turn=0.25,
+            duration_sec=2.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_invalid_motion_intent_params_are_rejected_before_bridge_call(self, controller):
+        controller.client.send_command = AsyncMock(
+            return_value=_mock_command_response("walk_forward")
+        )
+        intent = Intent(
+            action="walk_forward",
+            route="direct",
+            params={"speed": 2.0},
+            raw_text="move_robot walk_forward",
+        )
+
+        resp = await controller.execute(intent)
+
+        assert resp.success is False
+        assert "less than or equal to 1" in resp.error
+        controller.client.send_command.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_walk_backward(self, controller):
         controller.client.send_command = AsyncMock(
             return_value=_mock_command_response("walk_backward")

@@ -4,6 +4,7 @@ import threading
 import pytest
 
 from duck_agent_sim.schemas import ControlIntent, RobotState, SafetyConfig
+from duck_agent_sim.config import DUCK_POLICY_CONTRACT_WARNINGS
 from duck_agent_sim.simulator import duck_sim
 from duck_agent_sim.simulator.control_plane import DesiredMotionState
 from duck_agent_sim.simulator.duck_sim import MockDuckSimulator, RealDuckSimulator
@@ -74,6 +75,10 @@ def test_policy_contract_startup_validation_is_warning_only(monkeypatch, caplog)
         sim._validate_policy_contract_warnings()
 
     assert "Policy contract validation warning pass failed" in caplog.text
+
+
+def test_policy_contract_startup_warnings_are_env_gated_by_default():
+    assert DUCK_POLICY_CONTRACT_WARNINGS is False
 
 
 def test_policy_contract_startup_validation_logs_issues_without_failing(caplog):

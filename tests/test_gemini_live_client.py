@@ -86,6 +86,7 @@ class TestGeminiLiveToolExecution:
         assert intent.action == "walk_forward"
         assert intent.route == "direct"
         assert intent.params["speed"] == 0.5
+        assert intent.params["turn"] == 0.0
         assert intent.params["duration_sec"] == 2.0
 
     @pytest.mark.asyncio

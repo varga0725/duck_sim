@@ -57,6 +57,7 @@ from duck_agent_sim.config import (
     DUCK_HYBRID_QVEL_XY_SCALE,
     DUCK_HYBRID_Z_FORCE_SCALE,
     DUCK_ONNX_MODEL_PATH,
+    DUCK_POLICY_CONTRACT_WARNINGS,
 )
 
 
@@ -769,7 +770,8 @@ class RealDuckSimulator(DuckSimulator):
         except Exception as e:
             logger.error(f"Error mapping telemetry sensor indices: {e}")
 
-        self._validate_policy_contract_warnings()
+        if DUCK_POLICY_CONTRACT_WARNINGS:
+            self._validate_policy_contract_warnings()
 
         # Start the physics stepping and viewer thread
         self._running = True

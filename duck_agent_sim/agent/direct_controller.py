@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from duck_agent_sim.agent.hermes_client import HermesRobotClient
 from duck_agent_sim.agent.agent_response import AgentResponse
 from duck_agent_sim.agent.smart_router import Intent
-from duck_agent_sim.schemas import FollowerConfigSchema
+from duck_agent_sim.schemas import FollowerConfigSchema, RobotCommand
 
 logger = logging.getLogger("direct-controller")
 
@@ -79,7 +79,8 @@ class DirectController:
             if params is None:
                 return self._error(intent, f"Unknown direct action: {intent.action}", t0)
 
-            response = await self.client.send_command(**params)
+            command_params = self._motion_params_for_intent(intent, params)
+            response = await self.client.send_command(**command_params)
             return self._ok(intent, response.state, t0)
 
         except Exception as exc:
@@ -148,3 +149,19 @@ class DirectController:
     async def close(self):
         """Shutdown the underlying HTTP client."""
         await self.client.close()
+
+    @staticmethod
+    def _motion_params_for_intent(intent: Intent, defaults: Dict[str, Any]) -> Dict[str, Any]:
+        params = defaults.copy()
+        for key in ("speed", "turn", "duration_sec"):
+            if key in intent.params:
+                params[key] = intent.params[key]
+
+        # Reuse the public command schema constraints without changing the public API.
+        validated = RobotCommand(**params)
+        return {
+            "command": validated.command,
+            "speed": validated.speed,
+            "turn": validated.turn,
+            "duration_sec": validated.duration_sec,
+        }

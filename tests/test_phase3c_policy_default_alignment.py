@@ -8,7 +8,10 @@ import pytest
 from duck_agent_sim.simulator.policy_contract import (
     ACTUATOR_ORDER,
     DEFAULT_ACTUATOR,
+    OBSERVATION_SIZE,
     POLICY_OUTPUT_SIZE,
+    apply_action_to_targets,
+    apply_target_rate_limit,
 )
 from duck_agent_sim.simulator.policy_default_report import (
     compare_default_actuator_to_home_ctrl,
@@ -69,6 +72,57 @@ def test_upstream_policy_adapter_spec_and_state_can_be_instantiated_without_mujo
     np.testing.assert_allclose(state.prev_motor_targets, DEFAULT_ACTUATOR)
     assert state.last_action.shape == (POLICY_OUTPUT_SIZE,)
     assert state.imitation_phase.tolist() == [1.0, 0.0]
+
+
+def test_upstream_policy_adapter_shadow_compare_reports_matching_local_path():
+    adapter = UpstreamPolicyExecutionAdapter()
+    action = np.full(POLICY_OUTPUT_SIZE, 0.1, dtype=np.float32)
+    previous = DEFAULT_ACTUATOR.copy()
+    expected_targets = apply_target_rate_limit(apply_action_to_targets(action), previous)
+
+    report = adapter.shadow_compare(
+        local_observation=np.zeros(OBSERVATION_SIZE, dtype=np.float32),
+        action=action,
+        local_motor_targets=expected_targets,
+        previous_targets=previous,
+        home_ctrl=DEFAULT_ACTUATOR.copy(),
+        command_vector=np.zeros(7, dtype=np.float32),
+        upstream_command_vector=np.zeros(7, dtype=np.float32),
+        local_phase_period=50,
+        upstream_phase_period=50,
+    )
+
+    assert report.ok
+    assert report.observation_shape_ok
+    assert report.action_shape_ok
+    assert report.motor_target_shape_ok
+    assert report.max_motor_target_delta == 0.0
+    assert report.default_alignment.within_tolerance
+
+
+def test_upstream_policy_adapter_shadow_compare_reports_mismatches():
+    adapter = UpstreamPolicyExecutionAdapter()
+    action = np.zeros(POLICY_OUTPUT_SIZE, dtype=np.float32)
+
+    report = adapter.shadow_compare(
+        local_observation=np.zeros(OBSERVATION_SIZE + 1, dtype=np.float32),
+        action=action,
+        local_motor_targets=DEFAULT_ACTUATOR + 0.01,
+        previous_targets=DEFAULT_ACTUATOR.copy(),
+        home_ctrl=DEFAULT_ACTUATOR.copy(),
+        actuator_names=tuple(reversed(ACTUATOR_ORDER)),
+        command_vector=np.ones(7, dtype=np.float32),
+        upstream_command_vector=np.zeros(7, dtype=np.float32),
+        local_phase_period=50,
+        upstream_phase_period=60,
+    )
+
+    assert not report.ok
+    assert not report.observation_shape_ok
+    assert not report.actuator_order_ok
+    assert report.phase_timing_mismatch
+    assert report.command_mismatch
+    assert report.max_motor_target_delta > 0.0
 
 
 @pytest.mark.skipif(
