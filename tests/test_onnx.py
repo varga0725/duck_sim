@@ -42,8 +42,9 @@ def test_onnx_model_loading_and_shape():
 
 
 @pytest.mark.skipif(
-    importlib.util.find_spec("mujoco") is None,
-    reason="MuJoCo is optional in unit-test environments",
+    importlib.util.find_spec("mujoco") is None
+    or importlib.util.find_spec("mujoco_playground") is None,
+    reason="MuJoCo/Open Duck Playground dependencies are optional in unit-test environments",
 )
 def test_real_simulator_onnx_observation_shape_when_mujoco_available():
     from duck_agent_sim.simulator.duck_sim import RealDuckSimulator

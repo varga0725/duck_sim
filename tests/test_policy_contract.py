@@ -1,4 +1,6 @@
 import importlib.util
+import sys
+from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
@@ -189,6 +191,12 @@ def test_mujoco_actuator_ctrlrange_is_present_or_policy_targets_stay_clipped():
         return
 
     import mujoco
+
+    pytest.importorskip("mujoco_playground")
+    external_path = Path(__file__).resolve().parents[1] / "external" / "Open_Duck_Playground"
+    if str(external_path) not in sys.path:
+        sys.path.append(str(external_path))
+
     from playground.open_duck_mini_v2 import base
     from playground.open_duck_mini_v2.constants import FLAT_TERRAIN_XML
 
