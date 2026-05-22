@@ -45,6 +45,7 @@ from duck_agent_sim.simulator.policy_contract import (
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
 from duck_agent_sim.config import (
     DUCK_DYNAMICS_MODE,
+    DUCK_HYBRID_RP_QVEL_ZERO_SCALE,
     DUCK_HYBRID_QVEL_XY_SCALE,
     DUCK_HYBRID_Z_FORCE_SCALE,
     DUCK_ONNX_MODEL_PATH,
@@ -616,6 +617,7 @@ class RealDuckSimulator(DuckSimulator):
             mode=self._dynamics_mode,
             hybrid_qvel_xy_scale=DUCK_HYBRID_QVEL_XY_SCALE,
             hybrid_z_force_scale=DUCK_HYBRID_Z_FORCE_SCALE,
+            hybrid_rp_qvel_zero_scale=DUCK_HYBRID_RP_QVEL_ZERO_SCALE,
         )
         
         # ONNX Control state variables

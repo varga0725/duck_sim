@@ -40,10 +40,21 @@ def parse_hybrid_z_force_scale(value: str | None) -> float:
     return 1.0
 
 
+def parse_hybrid_rp_qvel_zero_scale(value: str | None) -> float:
+    try:
+        scale = float(value) if value is not None else 1.0
+    except (TypeError, ValueError):
+        return 1.0
+    if scale in (0.0, 0.5, 1.0):
+        return scale
+    return 1.0
+
+
 # Dynamics migration mode. Phase 2A is instrumentation/scaffold only.
 DUCK_DYNAMICS_MODE: DynamicsMode = parse_duck_dynamics_mode(os.getenv("DUCK_DYNAMICS_MODE"))
 DUCK_HYBRID_QVEL_XY_SCALE = parse_hybrid_qvel_xy_scale(os.getenv("DUCK_HYBRID_QVEL_XY_SCALE"))
 DUCK_HYBRID_Z_FORCE_SCALE = parse_hybrid_z_force_scale(os.getenv("DUCK_HYBRID_Z_FORCE_SCALE"))
+DUCK_HYBRID_RP_QVEL_ZERO_SCALE = parse_hybrid_rp_qvel_zero_scale(os.getenv("DUCK_HYBRID_RP_QVEL_ZERO_SCALE"))
 
 # ONNX model path for real MuJoCo inference
 _default_model = os.path.join(os.path.dirname(__file__), "models", "BEST_WALK_ONNX_2.onnx")

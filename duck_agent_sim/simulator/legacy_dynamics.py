@@ -14,6 +14,8 @@ class LegacyDynamicsDiagnostics:
     torso_quaternion_overwrite_count: int = 0
     qvel_xy_forcing_count: int = 0
     qvel_roll_pitch_zeroing_count: int = 0
+    qvel_roll_pitch_damping_magnitude_sum: float = 0.0
+    qvel_roll_pitch_damping_magnitude_max: float = 0.0
     qpos_z_correction_magnitude_sum: float = 0.0
     qpos_z_correction_magnitude_max: float = 0.0
     correction_magnitude_sum: float = 0.0
@@ -48,6 +50,7 @@ class LegacyDynamicsController:
     fixed_dt_sec: float = 0.002
     hybrid_qvel_xy_scale: float = 1.0
     hybrid_z_force_scale: float = 1.0
+    hybrid_rp_qvel_zero_scale: float = 1.0
     diagnostics: LegacyDynamicsDiagnostics = field(default_factory=LegacyDynamicsDiagnostics)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -109,8 +112,14 @@ class LegacyDynamicsController:
             simulator.data.qpos[0] += global_vx * self.fixed_dt_sec
             simulator.data.qpos[1] += global_vy * self.fixed_dt_sec
 
-        simulator.data.qvel[3] = 0.0
-        simulator.data.qvel[4] = 0.0
+        rp_qvel_zero_scale = self.hybrid_rp_qvel_zero_scale if self.mode == "hybrid" else 1.0
+        before_roll_qvel = float(simulator.data.qvel[3])
+        before_pitch_qvel = float(simulator.data.qvel[4])
+        rp_qvel_damping_magnitude = math.hypot(before_roll_qvel, before_pitch_qvel) * rp_qvel_zero_scale
+        rp_qvel_zeroed = not (self.mode == "hybrid" and rp_qvel_zero_scale == 0.0)
+        if rp_qvel_zeroed:
+            simulator.data.qvel[3] = before_roll_qvel * (1.0 - rp_qvel_zero_scale)
+            simulator.data.qvel[4] = before_pitch_qvel * (1.0 - rp_qvel_zero_scale)
         simulator.data.qvel[5] = simulator._current_yaw_rate
 
         left_contact = simulator.check_contact("foot_assembly", "floor")
@@ -137,6 +146,8 @@ class LegacyDynamicsController:
             qvel_xy_commanded_magnitude=qvel_xy_commanded_magnitude,
             qpos_z_forced=z_forced,
             qpos_z_correction_magnitude=abs(float(z_correction)),
+            rp_qvel_zeroed=rp_qvel_zeroed,
+            rp_qvel_damping_magnitude=rp_qvel_damping_magnitude,
         )
 
     def record(
@@ -158,6 +169,8 @@ class LegacyDynamicsController:
         qvel_xy_commanded_magnitude: float,
         qpos_z_forced: bool,
         qpos_z_correction_magnitude: float,
+        rp_qvel_zeroed: bool,
+        rp_qvel_damping_magnitude: float,
     ) -> None:
         correction = float(np.linalg.norm(after_qpos - before_qpos) + np.linalg.norm(after_qvel - before_qvel))
         with self._lock:
@@ -166,7 +179,12 @@ class LegacyDynamicsController:
             d.qpos_z_forcing_count += int(qpos_z_forced)
             d.torso_quaternion_overwrite_count += 1
             d.qvel_xy_forcing_count += int(qvel_xy_forced)
-            d.qvel_roll_pitch_zeroing_count += 1
+            d.qvel_roll_pitch_zeroing_count += int(rp_qvel_zeroed)
+            d.qvel_roll_pitch_damping_magnitude_sum += float(rp_qvel_damping_magnitude)
+            d.qvel_roll_pitch_damping_magnitude_max = max(
+                d.qvel_roll_pitch_damping_magnitude_max,
+                float(rp_qvel_damping_magnitude),
+            )
             d.qpos_z_correction_magnitude_sum += float(qpos_z_correction_magnitude)
             d.qpos_z_correction_magnitude_max = max(
                 d.qpos_z_correction_magnitude_max,
