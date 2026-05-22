@@ -40,7 +40,14 @@ from duck_agent_sim.simulator.policy_contract import (
     DOF_VEL_SCALE,
     apply_action_to_targets,
     apply_target_rate_limit,
+    clamp_control_to_policy_limits,
     clamp_targets_to_ctrlrange,
+)
+from duck_agent_sim.simulator.policy_contract_validator import (
+    validate_control_cadence,
+    validate_mujoco_model,
+    validate_onnx_session,
+    validate_upstream_reference,
 )
 from duck_agent_sim.simulator.safety import is_fallen, should_auto_stop, with_stability
 from duck_agent_sim.config import (
@@ -113,6 +120,27 @@ def _unavailable_sensor_state(mode: str, sim_time: float) -> SensorsState:
             "right": SensorAvailability(available=False),
         },
     )
+
+
+def _clamp_control_intent(control: ControlIntent) -> ControlIntent:
+    clamped = clamp_control_to_policy_limits(control.linear_x, control.linear_y, control.yaw)
+    return ControlIntent(
+        linear_x=clamped.linear_x,
+        linear_y=clamped.linear_y,
+        yaw=clamped.yaw,
+    )
+
+
+def _log_policy_validation_report(report) -> None:
+    for issue in report.issues:
+        logger.warning(
+            "Policy contract validation %s in %s: %s expected=%r actual=%r",
+            issue.severity,
+            report.name,
+            issue.message,
+            issue.expected,
+            issue.actual,
+        )
 
 
 class MockDuckSimulator(DuckSimulator):
@@ -239,9 +267,10 @@ class MockDuckSimulator(DuckSimulator):
         now = time.monotonic()
         expires_at = now + duration_sec if duration_sec is not None else None
         with self._intent_lock:
+            clamped_control = _clamp_control_intent(control)
             self._desired_motion = DesiredMotionState(
                 command=command,
-                control=control.model_copy(deep=True),
+                control=clamped_control,
                 safety=safety or SafetyConfig(),
                 started_at=now,
                 expires_at=expires_at,
@@ -740,6 +769,8 @@ class RealDuckSimulator(DuckSimulator):
         except Exception as e:
             logger.error(f"Error mapping telemetry sensor indices: {e}")
 
+        self._validate_policy_contract_warnings()
+
         # Start the physics stepping and viewer thread
         self._running = True
         self._thread = threading.Thread(target=self._physics_loop, daemon=True)
@@ -842,6 +873,20 @@ class RealDuckSimulator(DuckSimulator):
         # Shutdown sequence
         if viewer is not None:
             viewer.close()
+
+    def _validate_policy_contract_warnings(self):
+        try:
+            reports = [
+                validate_mujoco_model(self.model),
+                validate_control_cadence(self.model.opt.timestep, decimation=10),
+                validate_upstream_reference(open_duck_path),
+            ]
+            if self._onnx_session is not None:
+                reports.append(validate_onnx_session(self._onnx_session))
+            for report in reports:
+                _log_policy_validation_report(report)
+        except Exception as e:
+            logger.warning("Policy contract validation warning pass failed: %s", e)
 
     def _get_onnx_obs(self) -> np.ndarray:
         with self._lock:
@@ -1219,9 +1264,10 @@ class RealDuckSimulator(DuckSimulator):
     ) -> RobotState:
         self._initialize_mujoco()
         with self._lock:
-            self._target_linear_x = control.linear_x
-            self._target_linear_y = control.linear_y
-            self._target_yaw_rate = control.yaw
+            clamped_control = _clamp_control_intent(control)
+            self._target_linear_x = clamped_control.linear_x
+            self._target_linear_y = clamped_control.linear_y
+            self._target_yaw_rate = clamped_control.yaw
             self._last_command = command
             self._last_command_time = time.time()
             self._safety_config = safety or SafetyConfig()
@@ -1392,9 +1438,10 @@ class RealDuckSimulator(DuckSimulator):
 
     def step(self, control: ControlIntent, dt: float, safety: SafetyConfig) -> RobotState:
         self._initialize_mujoco()
-        self._target_linear_x = control.linear_x
-        self._target_linear_y = control.linear_y
-        self._target_yaw_rate = control.yaw
+        clamped_control = _clamp_control_intent(control)
+        self._target_linear_x = clamped_control.linear_x
+        self._target_linear_y = clamped_control.linear_y
+        self._target_yaw_rate = clamped_control.yaw
         self._last_command_time = time.time()
 
         return self.get_state()
