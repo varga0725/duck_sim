@@ -15,7 +15,7 @@ class SimulatorProxy:
 
     def __init__(self):
         self._wrapped = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def set_instance(self, instance: Any):
         with self._lock:

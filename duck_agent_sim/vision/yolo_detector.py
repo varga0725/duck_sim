@@ -7,8 +7,8 @@ from ultralytics import YOLO
 
 class YOLODetector:
     """
-    Singleton YOLOv8 Object Detector.
-    Lazily loads YOLOv8n and runs inference on CPU/GPU.
+    Singleton YOLO Object Detector.
+    Lazily loads YOLO11 (defaults to yolo11n) or other models and runs inference on CPU/GPU.
     Supports mock detection outputs in simulation mock mode to ensure quick test feedback.
     """
     _instance = None
@@ -21,7 +21,7 @@ class YOLODetector:
                 cls._instance._initialized = False
             return cls._instance
             
-    def __init__(self, model_name: str = "yolov8n.pt", conf_threshold: float = 0.5, img_sz: int = 640):
+    def __init__(self, model_name: str = "yolo11n.pt", conf_threshold: float = 0.5, img_sz: int = 640):
         if self._initialized:
             return
         self.model_name = model_name

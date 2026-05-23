@@ -6,8 +6,8 @@ frame = cv2.imread("fpv_test_frame.png")
 # YOLO expects RGB
 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-print("Loading yolov8n.pt...")
-model = YOLO("yolov8n.pt")
+print("Loading yolo11n.pt...")
+model = YOLO("yolo11n.pt")
 
 print("Running inference with conf=0.01...")
 results = model(frame_rgb, conf=0.01, verbose=True)

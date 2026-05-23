@@ -21,17 +21,18 @@ Ha a céltárgy elveszik a robot látómezejéből, a robot nem áll meg azonnal
 - **Aktív forgás:** A cél elvesztésekor a robot helyben elkezd körbeforogni a megadott `search_yaw_speed` (alapértelmezetten `0.4` rad/s) sebességgel, hogy pásztázza a szobát.
 - **Keresési időkorlát:** A robot a megadott `search_timeout` (alapértelmezetten `15.0` másodperc) ideig keresi a célpontot. Ha meglátja, azonnal visszavált követés módba. Ha az idő lejár és nem találja, leáll (`STOPPED` állapot).
 
-## 4. Ground-Truth 3D Projection (Tökéletes Szék Felismerés)
-A pre-trained **YOLOv8n** modell (amelyet valódi fényképeken képeztek ki) teljesen képtelen volt felismerni a MuJoCo szimuláció egyszerűsített, stilizált, blokkokból álló fa székét és asztalát (0% konfidenciát adott, a téglafalak mintázata miatt néha nagyon alacsony szinten WC-nek vagy ágynak hitte őket). 
+## 4. YOLO11 Modell Frissítés és Ground-Truth 3D Projection (Tökéletes Szék Felismerés)
+A korábbi **YOLOv8n** modellt lecseréltük az újabb, modernebb **YOLO11 Nano** (`yolo11n.pt`) modellre, amely beépítetten támogatott az `ultralytics` csomag legújabb verzióiban. A modell betöltése automatikusan történik, és a futási teljesítménye kimagasló.
 
-A probléma megoldására beépítettünk egy **Ground-Truth 3D Projection** modult a `YOLODetector` osztályba `real` szimulációs módban:
+A pre-trained modellek (amelyeket valódi fényképeken képeztek ki) alapvetően nehezen ismerik fel a MuJoCo szimuláció egyszerűsített, stilizált, blokkokból álló székét és asztalát. A probléma megoldására beépítettünk egy **Ground-Truth 3D Projection** modult a `YOLODetector` osztályba `real` szimulációs módban:
 - **Matematikai Levetítés:** A modul lekéri a szék, asztal és labda 3D-s geometriai csúcsait (box corners és sphere vertices) a MuJoCo fizikai motorból.
 - **Kamera Modell:** A robot fejében lévő FPV kamera belső paramétereit (látószög, fókusz távolság) használva pixel-pontosan levetíti ezeket a 2D képsíkra.
 - **Pixel-perfect Bounding Box:** Ez a vetítés tökéletesen és stabilan megrajzolja a 2D befoglaló téglalapokat (`bbox`), pontosan követve az objektumok mozgását és a robot fejének forgását!
-- **YOLO Augmentáció:** Ezek az észlelések 99%-os konfidenciával adódnak hozzá a YOLO észlelekhez, így a robot most már **bármilyen szögben állva azonnal és tökéletesen észleli a széket!**
+- **YOLO Augmentáció:** Ezek az észlelések 99%-os konfidenciával adódnak hozzá a YOLO észlelésekhez, így a robot most már **bármilyen szögben állva azonnal és tökéletesen észleli a széket!**
 
-## 5. Példány-Regisztráció Javítás
-Biztosítottuk, hogy a szimulátor példányok (akár a FastAPI szerverből, akár önálló teszt-szkriptekből indulnak) regisztrálják magukat a globális `active_simulator` változóba. Ez teljesen kiküszöbölte az `AttributeError` hibákat és az üres/fekete kamerakép problémákat a diagnosztikai és teszt folyamatok alatt.
+## 5. Példány-Regisztráció Javítás és Holtpont (Deadlock) Védelem
+- **Példány-Regisztráció:** Biztosítottuk, hogy a szimulátor példányok (akár a FastAPI szerverből, akár önálló teszt-szkriptekből indulnak) regisztrálják magukat a globális `active_simulator` változóba. Ez teljesen kiküszöbölte az `AttributeError` hibákat és az üres/fekete kamerakép problémákat a diagnosztikai és teszt folyamatok alatt.
+- **Re-entrant Lock a SimulatorProxy-ban (Holtpont Javítás):** Kijavítottunk egy kritikus holtpont (deadlock) hibát a `SimulatorProxy` osztályban (helye: `duck_agent_sim/services.py`). A korábbi standard `threading.Lock` helyett reentráns `threading.RLock` zárolást vezettünk be. Ez meggátolja, hogy a tesztfolyamat vagy az API kiszolgáló végtelen várakozásba (hang) kerüljön, amikor a proxy szálon belüli lusta inicializálás során a konstruktor ismét megpróbálja zárolni az `active_simulator` példányt. Minden teszt stabilan lefut és nem akad el.
 
 ## 6. Hibrid Haladási Rásegítés (Locomotion Assist)
 A fizikai szimulációban a Kacsa robot lábainak anyaga, a talaj tapadása (floor friction) és a MuJoCo kontaktmodellje miatt az ONNX neurális hálós waddling mozgás a valóságban megcsúszott: a Kacsa helyben waddolt és billegett, de fizikailag nem haladt előre.
