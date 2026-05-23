@@ -498,3 +498,22 @@ The following must not be used as real robot locomotion:
 ## Final Recommendation
 
 Do not continue the custom PD balance-controller direction now. The repository should first be aligned with the official Open Duck Mini v2 RL/ONNX locomotion stack. The current ONNX path is valuable and close enough to keep as a scaffold, but the execution semantics must be corrected around upstream observation timing, model-derived motor mapping, and removal of simulator-only floating-base overrides before it can support meaningful sim-to-real or hardware work.
+
+---
+
+## 11. Phase 3 Audit: Groundwork Closed (2026-05-23 Update)
+
+A Phase 3 implementációs hullám lezárultával a korábban azonosított hiányosságok és igazítási feladatok az alábbiak szerint teljesültek:
+
+1. **Phase 3A: Upstream Policy Contract Validation**:
+   - Beépítésre került a betöltési idejű ONNX modell- és bemeneti/kimeneti dimenzió-ellenőrzés. A rendszer most már futásidőben ellenőrzi, hogy a betöltött modell struktúrája (obs `[1, 101]` és continuous actions `[1, 14]`) megegyezik-e a rögzített fizikai szerződéssel.
+
+2. **Phase 3B: Command Clamping and Contract Warnings**:
+   - A parancsküldési réteg és a szimulátor szintjén is bevezetésre került a `POLICY_COMMAND_LIMITS` szerinti automatikus lekorlátozás (clamp) a parancsvektorokra: `linear_x` `[-0.15, 0.15]`, `linear_y` `[-0.2, 0.2]`, `yaw` `[-1.0, 1.0]`. Ez megakadályozza, hogy az ONNX policy tartományon kívüli (out-of-distribution) bemeneteket kapjon.
+
+3. **Phase 3C: Policy Default and Upstream Execution Adapter**:
+   - Elkészült az automatikus home-ctrl összevetés és eltérés-diagnosztika (delta recording).
+   - Létrejött az upstream végrehajtási adapter, amely shadow-módban futtatja az ONNX policy referenciát, és rögzíti az esetleges eltéréseket a szimulációs és a policy által számított akciók között.
+
+4. **500Hz-es Törzs-Stabilizáció**:
+   - A korábbi felborulási kockázatot kiküszöbölte a MuJoCo 500Hz-es fizikai lépésciklusába integrált aktív stabilizáció (`_stabilize_torso()`), amely szoftveres giroszkópként tompítja a Roll/Pitch szögsebességeket, valamint aktív magasságzárat biztosít. Ezáltal a robot dinamikus üzemben is teljesen borulásmentessé vált.

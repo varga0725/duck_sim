@@ -81,7 +81,7 @@ current += (target - current) * 0.15
 TODO / UNKNOWN:
 
 - Nincs egyértelmű bizonyíték arra, hogy a `BEST_WALK_ONNX_2.onnx` pontosan melyik command tartományon lett tanítva. A legjobb forrás a `mujoco_infer.py` fenti konstansai.
-- A bridge `RobotCommand.speed` sémája `0.0..1.0`, ami nagyobb, mint a `mujoco_infer.py` eredeti `lin_vel_x` tartománya (`[-0.15, 0.15]`). A bridge kódban nem látszik explicit clamp a policy eredeti command range-ére.
+- **Megoldva**: A bridge `RobotCommand` parancsküldő rétege és a szimulátor most már expliciten és automatikusan lekorlátozza (clamp) a célelmozdulás parancsokat a policy eredeti command limitjeire a `POLICY_COMMAND_LIMITS` (`linear_x`: `[-0.15, 0.15]`, `linear_y`: `[-0.2, 0.2]`, `yaw`: `[-1.0, 1.0]`) alapján.
 - `head_yaw` tartományban eltérés van: deployment viewer `[-1.5, 1.5]`, tréning config `[-2.7, 2.7]`. A konkrét ONNX tréningkonfiguráció nincs a repóban bizonyítva.
 
 ### Szenzor normalizáció, zaj, delay
@@ -253,5 +253,5 @@ data.ctrl[:] = motor_targets
 - TODO: A konkrét ONNX exporthoz tartozó tréning checkpoint/config azonosítása, ha elérhető máshol.
 - TODO: ONNX graph részletes vizsgálata, hogy van-e output tanh/clamp vagy csak lineáris continuous action fej.
 - TODO: A policy eredeti command range-ének megerősítése a modellhez tartozó training logból vagy configból.
-- TODO: A bridge command mapping clampelése vagy dokumentált szűkítése a policy feltételezett command tartományaira.
+- **Megoldva**: A bridge command mapping le van szűkítve és clampelve a policy command tartományaira a szimulátor szintjén.
 - TODO: A MuJoCo actuator ctrlrange enforcement explicit tesztelése vagy kódbeli clipping hozzáadása, ha szükséges.

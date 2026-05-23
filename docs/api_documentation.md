@@ -14,8 +14,9 @@ The API handles:
 | Category | Method | Path | Description |
 |---|---|---|---|
 | **System** | `GET` | `/health` | Fetch API health status, active simulation backend mode. |
+| **System** | `GET` | `/camera/info` | Get the camera's resolution, vertical FOV, pinhole intrinsics, and extrinsics coordinates for the active simulation mode. |
 | **Control** | `POST` | `/command` | Validate and execute high-level motion command with safety parameters. |
-| **Control** | `GET` | `/state` | Retrieve current 3D position, orientation, feet contacts, and fall state. |
+| **Control** | `GET` | `/state` | Retrieve current 3D position, orientation, feet contacts, stability status, safety thresholds, and fall state. |
 | **Control** | `POST` | `/stop` | Immediately halt robot motion and reset waddle trajectory. |
 | **Control** | `POST` | `/reset` | Teleport the robot back to the initial stable starting coordinate. |
 | **Control** | `POST` | `/scenario/walk-square` | Execute a pre-scripted 4-sided square route with safety tracking. |
@@ -25,6 +26,8 @@ The API handles:
 | **Follower** | `POST` | `/vision/follow/start` | Start the autonomous following loop (with optional parameter tuning). |
 | **Follower** | `POST` | `/vision/follow/stop` | Stop the follow loop and command the robot to stand still. |
 | **Follower** | `GET` | `/vision/follow/status` | Get telemetry, state machine mode, target coordinates, and command offsets. |
+| **Map** | `GET` | `/map` | Retrieve the 2D occupancy grid and semantic landmarks mapped by the Spatial World Model. |
+| **Map** | `POST` | `/map/reset` | Reset the 2D occupancy grid map and semantic landmarks memory. |
 
 ---
 
@@ -50,6 +53,52 @@ curl -s http://127.0.0.1:8765/health
   "status": "ok",
   "sim_mode": "mock",
   "robot": "open_duck_mini_v2"
+}
+```
+
+---
+
+### `GET /camera/info`
+Returns the public camera intrinsics/extrinsics contract for the active simulation mode (`mock`, `real`, or `webcam`).
+
+* **Response Model**: `CameraInfoResponse`
+* **Response Fields**:
+  * `mode` (string): The active simulation mode (`"mock"`, `"real"`, `"webcam"`).
+  * `width` (int): Camera frame width in pixels (`640`).
+  * `height` (int): Camera frame height in pixels (`480`).
+  * `fovy` (float, optional): Vertical field of view in degrees (e.g. `45.0` in mock/real).
+  * `intrinsics` (object, optional): Pinhole camera intrinsics (`fx`, `fy`, `cx`, `cy`).
+  * `distortion` (array of floats, optional): Lens distortion parameters (currently null/undistorted).
+  * `calibrated` (bool): True if camera parameters are contract-defined and calibrated.
+  * `camera_frame` (string): Name of the camera frame (e.g. `"fpv"`, `"mock_camera"`, `"webcam"`).
+  * `extrinsics` (object, optional): The transform from the reference frame (`reference_frame`, `translation_m`, `quaternion_wxyz`).
+
+#### Curl Example
+```bash
+curl -s http://127.0.0.1:8765/camera/info
+```
+
+#### Example Response (Real Mode)
+```json
+{
+  "mode": "real",
+  "width": 640,
+  "height": 480,
+  "fovy": 45.0,
+  "intrinsics": {
+    "fx": 579.4112549695428,
+    "fy": 579.4112549695428,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "distortion": null,
+  "calibrated": true,
+  "camera_frame": "fpv",
+  "extrinsics": {
+    "reference_frame": "head_assembly",
+    "translation_m": [0.08, 0.0, 0.05],
+    "quaternion_wxyz": [0.70710678, 0.0, 0.0, -0.70710678]
+  }
 }
 ```
 
@@ -360,6 +409,8 @@ Starts the vision-guided target follower. Accepts an optional configuration sche
   * `max_speed` (float, Default: `0.3`): Speed limit (m/s).
   * `max_yaw` (float, Default: `0.8`): Turn rate limit (rad/s).
   * `yaw_smooth_alpha` (float, Default: `0.3`): Smoothing filter coefficient.
+  * `search_yaw_speed` (float, Default: `0.4`): Spin rate in rad/s while active search scanning for a lost target.
+  * `search_timeout` (float, Default: `15.0`): Search/scan duration in seconds before giving up and stopping.
 
 * **Response Fields**:
   * `status` (string, `"started"`): Confirms start.
@@ -474,3 +525,71 @@ curl -s http://127.0.0.1:8765/vision/follow/status
   1. The target follower is actively tracking a `"person"` object with tracker ID `2`.
   2. `error_x` is `149.0` (target is significantly to the right). The turn controller commands a proportional right turn: `commanded_yaw = -0.446 rad/s`.
   3. `error_h` is `-10.0` (target height `210.0` is within the distance deadzone of `200.0` with `20.0` tolerance). The speed controller commands the robot to stay stationary (`commanded_linear_x = 0.0 m/s`) to prioritize centering.
+
+---
+
+## 5. Spatial World Mapping Endpoints
+
+### `GET /map`
+Returns the 2D occupancy grid matrix and semantic landmarks stored in the Spatial World Model.
+
+* **Response Fields**:
+  * `grid` (array of arrays of ints): The 2D grid matrix (0 for free space, 1 for occupied space).
+  * `grid_info` (object): Map dimensions, cell size (resolution in meters), and origin coordinate in meters.
+  * `landmarks` (array of objects): Mapped landmarks with fields:
+    * `label` (string): The landmark label (e.g. `"chair"`, `"table"`, `"ball"`).
+    * `tracking_id` (int): The tracking ID.
+    * `position_m` (array of 3 floats): `[x, y, z]` global coordinate in meters.
+    * `last_seen_time` (float): Time since last update.
+
+#### Curl Example
+```bash
+curl -s http://127.0.0.1:8765/map
+```
+
+#### Example Response
+```json
+{
+  "grid": [
+    [0, 0, 0],
+    [0, 1, 0]
+  ],
+  "grid_info": {
+    "width": 100,
+    "height": 100,
+    "resolution_m": 0.05,
+    "origin_x_m": -2.5,
+    "origin_y_m": -2.5
+  },
+  "landmarks": [
+    {
+      "label": "chair",
+      "tracking_id": 1,
+      "position_m": [1.2, 0.4, 0.2],
+      "last_seen_time": 4.52
+    }
+  ]
+}
+```
+
+---
+
+### `POST /map/reset`
+Resets the 2D occupancy grid and landmark memory.
+
+* **Response Fields**:
+  * `status` (string, `"success"`): Confirms reset.
+  * `message` (string): Friendly status message.
+
+#### Curl Example
+```bash
+curl -X POST http://127.0.0.1:8765/map/reset
+```
+
+#### Example Response
+```json
+{
+  "status": "success",
+  "message": "Map and landmarks reset successfully"
+}
+```

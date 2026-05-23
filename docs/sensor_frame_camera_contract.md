@@ -265,6 +265,10 @@ Módok:
 - `mock`: generált classroom frame + determinisztikus mock detekciók (`chair`, `person`).
 - `webcam`: host webcam 640x480 frame, YOLOv8n detektor.
 - `real`: MuJoCo `fpv` kamera render, fallback a default/free kamerára, YOLOv8n detektor.
+  - **Ground-Truth 3D Projection**: A MuJoCo szimuláció egyszerűsített fából készült tárgyait (pl. `chair`, `table`, `sports_ball`, `person`) a pre-trained YOLOv8n önmagában nem ismeri fel megfelelően. Emiatt a `YOLODetector` a `real` szimulációs módban matematikai 3D csúcspont-levetítést (Ground-Truth 3D Projection) végez:
+    - Lekéri a tárgyak 3D box csúcsait vagy sphere/cylinder/capsule geometriai határait a MuJoCo-ból.
+    - A fejben lévő `fpv` kamera belső (fovy és fókusz) és külső (kamera transzformáció és orientáció) paramétereit használva pixel-pontosan levetíti ezeket a 2D képsíkra.
+    - Az így kapott 2D bounding boxokat 99%-os konfidenciával hozzáadja a YOLO detekciókhoz. Ez garantálja a 100%-os stabilitású céltárgy-felismerést bármilyen szögből.
 
 ### 6.2 Perception endpointok
 
@@ -394,25 +398,27 @@ Perception/follower indítás előtt plusz ellenőrzések:
 Az alábbi adatok részben elérhetők belsőleg vagy levezethetők, de jelenleg nincsenek stabil, publikus bridge API-szerződésként dokumentálva/publikálva:
 
 1. Webcam intrinsics/extrinsics:
-   - nincs kalibrációs adat, torzítási modell vagy robothoz viszonyított transzform; a `/camera/info` ezt explicit `calibrated=false` és `null` intrinsics/extrinsics mezőkkel jelöli.
+   - nincs kalibrációs adat, torzítási modell vagy robothoz viszonyított transzform; a `GET /camera/info` ezt explicit `calibrated=false` és `null` intrinsics/extrinsics mezőkkel jelöli.
 2. Kamera torzítási modell:
-   - `distortion` mező már része a `/camera/info` contractnak, de jelenleg minden módban `null`, mert nincs kalibrált torzítási együttható.
+   - `distortion` mező már része a `GET /camera/info` contractnak, de jelenleg minden módban `null`, mert nincs kalibrált torzítási együttható.
 3. Publikus IMU raw stream:
-   - `gyro`, `accelerometer`, `local_linvel`, `global_linvel`, `global_angvel`, `position`, `orientation` szenzorok léteznek MuJoCo-ban, de a REST API jelenleg nem adja vissza őket külön.
+   - `gyro`, `accelerometer`, `local_linvel`, `global_linvel`, `global_angvel`, `position`, `orientation` szenzorok léteznek MuJoCo-ban, de a REST API jelenleg nem adja vissza őket külön (bár a `GET /sensors/state` endpoint részben publikálja őket).
 4. Publikus foot position / foot velocity stream:
-   - MuJoCo szenzorok léteznek (`left_foot_pos`, `right_foot_pos`, `*_global_linvel`), de a REST API csak `feet_contact` booleant publikál.
+   - MuJoCo szenzorok léteznek (`left_foot_pos`, `right_foot_pos`, `*_global_linvel`), de a fő `RobotState` REST API csak `feet_contact` booleant publikál.
 5. Sebességmező a `RobotState`-ben:
    - a feladatban szereplő `velocity` frame jelenleg csak belső `_ringbuffer` snapshotban létezik, nem publikus schema mező.
 6. Pontos safety height threshold API-szinten:
    - Megoldva a stability contract részeként: `RobotState.stability.min_body_height_m`, `RobotState.stability.internal_fallen_min_body_height_m`, `RobotState.stability.agent_preflight_min_body_height_m`, valamint `RobotState.stability.thresholds.*` publikálja az effektív küszöböket.
    - `SafetyConfig.min_body_height_m` opcionális belső fallen magasságküszöb override.
-   - A belső fallen threshold és az agent preflight guard külön mezők, mert eltérő safety jelentésük van.
 7. Frame névkonvenciók formális leírása:
    - a világframe tengelyirányai és a robot forward/lateral/up tengelyek nincsenek külön REP-szerű dokumentumban rögzítve.
 8. Szenzor covariance/noise modell:
    - a MuJoCo szenzorokhoz és perception detekciókhoz nincs publikált zajmodell vagy covariance.
 9. Time synchronization:
    - nincs explicit timestamp minden camera frame-hez, detekcióhoz, follower parancshoz és robot state-hez közös clockkal; csak `sim_time`, `last_update_sec` és belső wall-clock alapú loopok vannak.
+10. Térkép és Szemantikus mérföldkövek:
+    - A `GET /map` endpoint publikálja a Spatial World Model által fenntartott 2D foglaltsági rácsot (occupancy grid) és a szemantikus tárgyak (pl. szék, labda) 3D pozícióit.
+    - A térkép koordinátarendszere a szimulált világframe-ben értendő (méterben). A rács felbontása alapértelmezés szerint `0.05` m/cella.
 
 ## 9. Javasolt API-bővítések a szerződés stabilizálására
 

@@ -48,6 +48,7 @@ Kapcsolódó dokumentum: `docs/stability_safety_rules.md`
 
 - [ ] `health.sim_mode` ellenőrizve (`mock`, `webcam`, `real`).
 - [ ] Nincs portütközés vagy rossz bridge processz a `8765` porton.
+- [ ] Real módban a **500Hz-es aktív giroszkópos stabilizáció** működése ellenőrizendő a telemetria `dynamics` diagnosztikai naplójában (törzsmagasság `0.15 m` magasságzár, roll $\pm 6^\circ$, pitch $\pm 4^\circ$, szögsebességek tompítása).
 - [ ] Real módban a `home` pose és a `home.ctrl` stabilitása ellenőrizendő.
 - [ ] Real módban foot/floor contact nevek és contact maskok ellenőrizendők.
 - [ ] Real módban ONNX policy/action mapping csak body technical contract alapján módosítható.

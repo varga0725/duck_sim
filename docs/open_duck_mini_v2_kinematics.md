@@ -52,17 +52,18 @@ world
 
 A `scene_flat_terrain.xml` ezen felül a világhoz kötött környezeti body-kat ad hozzá: `floor`, `wall_front`, `wall_left`, `wall_right`, `wall_back`, `table`, `chair`, valamint `sports_ball` egy külön freejointtal. Ezek nem részei a robot aktuátor/joint sorrendjének.
 
-## Site-ok és szenzorok
+## Site-ok, kamerák és szenzorok
 
-Robot site-ok:
+Robot site-ok és kamerák:
 
-| site | body | szerep |
+| elem | body | szerep / pozíció és orientáció |
 |---|---|---|
-| `imu` | `base` | IMU szenzorok rögzítési pontja |
-| `trunk` | `trunk_assembly` | törzs referencia site |
-| `left_foot` | `foot_assembly` | bal láb/foot frame |
-| `right_foot` | `foot_assembly_2` | jobb láb/foot frame |
-| `head` | `head_assembly` | fej referencia site |
+| `imu` (site) | `base` | IMU szenzorok rögzítési pontja |
+| `trunk` (site) | `trunk_assembly` | törzs referencia site |
+| `left_foot` (site) | `foot_assembly` | bal láb/foot frame |
+| `right_foot` (site) | `foot_assembly_2` | jobb láb/foot frame |
+| `head` (site) | `head_assembly` | fej referencia site |
+| `fpv` (camera) | `head_assembly` | Belső nézetes FPV kamera. Pozíció a fejhez képest: `[0.08, 0.0, 0.05]` m, local quaternion: `[0.70710678, 0.0, 0.0, -0.70710678]` (xyaxes: `0 -1 0 1 0 0`), vertical fovy: `45.0` fok. |
 
 MJCF szenzorok:
 

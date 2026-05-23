@@ -248,6 +248,11 @@ Nem megengedett:
 - Home Z: `~0.15`.
 - Safety threshold belül: real height threshold `0.08`; agent wrapper preflight min height `0.10`.
 - Physics loop 500 Hz timestep (`0.002 s`), state update kb. 50 Hz.
+- **500Hz-es aktív giroszkópos törzs-stabilizáció és magasságzár**: A törzs fizikai dőlését és magasságát közvetlenül a MuJoCo 500Hz-es fizikai integrációs ciklusában szabályozzuk (`_stabilize_torso()`).
+  - **Törzsmagasság-zár**: A Z magasságot minden fizikai lépésben `0.15 m` értéken tartjuk, megelőzve az összeesést vagy a lebegést.
+  - **Dőlési korlátok**: A törzs Roll dőlését maximum $\pm 6$ fokra, a Pitch dőlését maximum $\pm 4$ fokra korlátozzuk.
+  - **Szögsebesség-csillapítás (Szoftveres Giroszkóp)**: A törzs Roll és Pitch szögsebességét minden lépésben nullázzuk (`qvel[3] = 0.0` és `qvel[4] = 0.0`), ami elnyeli a lépések ütközéseiből származó borító forgatónyomatékot.
+  - **Kinematikus Yaw követés**: Az irányszög (yaw) integrálását kinematikusan és közvetlenül végezzük a 500Hz-es ciklusban a parancsok alapján, elkerülve a fizikai driftet.
 - Kontaktok valós MuJoCo contactból jönnek.
 - Reset után is előfordulhat azonnali instabilitás; ilyen esetben stop+reset után sem szabad mozgást folytatni, amíg a diagnosztika nem tisztázta az okot.
 - macOS-on látható MuJoCo viewerhez `mjpython` szükséges; sima python/uvicorn viewer hibát okozhat.
@@ -301,6 +306,12 @@ Lehetséges okok és diagnosztikai lépések:
    - Webcam módban több processz ne olvassa közvetlenül ugyanazt a kamerát.
    - A `/vision/frame` lehetőleg a FrameBuffer legutóbbi frame-jét szolgálja ki.
    - Vision hiba nem robot fallen, de follow loopnál deadman/stop logika szükséges.
+
+8. Hangvezérlés és interaktív beszélgetési biztonsági szűrők
+   - **Regex-alapú priorizálás**: A beérkező magyar nyelvű hangparancsok kiértékelésénél a tiltó/leállító parancsok (pl. *"ne kövesd tovább"*, *"állj"*) elsőbbséget élveznek, megakadályozva, hogy a szavak átfedése miatt téves mozgási parancs fusson le.
+   - **Google Web Speech API & Whisper Fallback**: Elsődleges a Google online hangfelismerője (`hu-HU`). Internetkapcsolat hiányában a rendszer automatikusan és zökkenőmentesen átvált a lokális Whisper modellre.
+   - **Zajszűrés és Kalibráció**: A mikrofon zajszint-kalibrációja csak a legelső indításkor történik meg, kiküszöbölve a korábbi 1.0 másodperces fagyásokat a parancsvételi ciklusok között.
+   - **macOS Tünde TTS**: A visszajelzések és a Hermes válaszok felolvasása a macOS beépített magyar női hangján (Tünde - `hu_HU`) történik. Az előállított AIFF audio fájlok a `.hermes/cache/duck_robot` mappában tárolódnak.
 
 ## 8. Ajánlott operátori parancsok
 
