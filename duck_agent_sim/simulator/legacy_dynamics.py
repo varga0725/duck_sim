@@ -64,6 +64,42 @@ class LegacyDynamicsController:
         before_qpos = np.array(simulator.data.qpos[0:7], copy=True)
         before_qvel = np.array(simulator.data.qvel[0:6], copy=True)
 
+        if self.mode == "pure_physics":
+            # Pure physics mode: no state injection, no coordinate/velocity forcing.
+            qw, qx, qy, qz = simulator.data.qpos[3:7]
+            roll, pitch, yaw = simulator.quaternion_to_euler(qw, qx, qy, qz)
+            simulator._kinematic_yaw = math.radians(yaw)
+            
+            left_contact = simulator.check_contact("foot_assembly", "floor")
+            right_contact = simulator.check_contact("foot_assembly_2", "floor")
+            actuator_saturation = self._actuator_saturation(simulator)
+            body_height = float(simulator.data.qpos[2])
+            fall_reason = self._fall_reason(roll, pitch, body_height)
+            
+            self.record(
+                before_qpos=before_qpos,
+                after_qpos=before_qpos,
+                before_qvel=before_qvel,
+                after_qvel=before_qvel,
+                roll_deg=roll,
+                pitch_deg=pitch,
+                body_height_m=body_height,
+                left_contact=left_contact,
+                right_contact=right_contact,
+                actuator_saturation=actuator_saturation,
+                fall_reason=fall_reason,
+                qpos_xy_integrated=False,
+                qvel_xy_forced=False,
+                qvel_xy_commanded_magnitude=0.0,
+                qpos_z_forced=False,
+                qpos_z_correction_magnitude=0.0,
+                rp_qvel_zeroed=False,
+                rp_qvel_damping_magnitude=0.0,
+                torso_orientation_overwritten=False,
+                torso_orientation_correction_magnitude=0.0,
+            )
+            return
+
         simulator._kinematic_yaw += simulator._current_yaw_rate * self.fixed_dt_sec
         yaw_rad = simulator._kinematic_yaw
 

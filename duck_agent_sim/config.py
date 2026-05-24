@@ -10,12 +10,12 @@ DUCK_SIM_MODE = os.getenv("DUCK_SIM_MODE", "mock").lower()
 if DUCK_SIM_MODE not in ("mock", "real", "webcam"):
     DUCK_SIM_MODE = "mock"
 
-DynamicsMode = Literal["legacy", "hybrid", "dynamic"]
+DynamicsMode = Literal["legacy", "hybrid", "dynamic", "pure_physics"]
 
 
 def parse_duck_dynamics_mode(value: str | None) -> DynamicsMode:
     mode = (value or "legacy").strip().lower()
-    if mode in ("legacy", "hybrid", "dynamic"):
+    if mode in ("legacy", "hybrid", "dynamic", "pure_physics"):
         return mode
     return "legacy"
 

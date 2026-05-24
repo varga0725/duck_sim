@@ -31,7 +31,15 @@ class DoubleBufferedState(Generic[T]):
         # Assigning reference is atomic in CPython due to the GIL
         state = self._read_state
         if hasattr(state, "model_copy"):
-            return state.model_copy(deep=True)
+            # Fast shallow-nested copy optimized for RobotState
+            new_copy = state.model_copy(deep=False)
+            if hasattr(state, "orientation") and state.orientation is not None:
+                new_copy.orientation = state.orientation.model_copy(deep=False)
+            if hasattr(state, "feet_contact") and state.feet_contact is not None:
+                new_copy.feet_contact = state.feet_contact.model_copy(deep=False)
+            if hasattr(state, "stability") and state.stability is not None:
+                new_copy.stability = state.stability.model_copy(deep=False)
+            return new_copy
         import copy
         return copy.deepcopy(state)
 
@@ -41,7 +49,14 @@ class DoubleBufferedState(Generic[T]):
         """
         with self._lock:
             if hasattr(state, "model_copy"):
-                self._write_state = state.model_copy(deep=True)
+                new_copy = state.model_copy(deep=False)
+                if hasattr(state, "orientation") and state.orientation is not None:
+                    new_copy.orientation = state.orientation.model_copy(deep=False)
+                if hasattr(state, "feet_contact") and state.feet_contact is not None:
+                    new_copy.feet_contact = state.feet_contact.model_copy(deep=False)
+                if hasattr(state, "stability") and state.stability is not None:
+                    new_copy.stability = state.stability.model_copy(deep=False)
+                self._write_state = new_copy
             else:
                 import copy
                 self._write_state = copy.deepcopy(state)
@@ -52,7 +67,8 @@ class DoubleBufferedState(Generic[T]):
         """
         with self._lock:
             if hasattr(self._write_state, "model_copy"):
-                self._read_state = self._write_state.model_copy(deep=True)
+                # No need to deepcopy again during swap if it was copied on write
+                self._read_state = self._write_state
             else:
                 import copy
                 self._read_state = copy.deepcopy(self._write_state)

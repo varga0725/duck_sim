@@ -68,11 +68,26 @@ class VisionLoop:
                         # 6. Update Spatial World Model
                         sim = self.camera_device.simulator
                         if hasattr(sim, "spatial_model") and sim.spatial_model is not None:
-                            state = sim.get_state()
+                            # Safely attempt to read state from shared memory if process-isolated
+                            try:
+                                from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
+                                bus = SharedTelemetryBus(create=False)
+                                shm_state = bus.get_state_ref()
+                                robot_x = shm_state.pos_x
+                                robot_y = shm_state.pos_y
+                                robot_yaw_deg = shm_state.yaw
+                                bus.close()
+                            except Exception:
+                                # Fall back to in-memory state for thread-based virtual simulation
+                                state = sim.get_state()
+                                robot_x = state.position[0]
+                                robot_y = state.position[1]
+                                robot_yaw_deg = state.orientation.yaw_deg
+
                             sim.spatial_model.update(
-                                robot_x=state.position[0],
-                                robot_y=state.position[1],
-                                robot_yaw_deg=state.orientation.yaw_deg,
+                                robot_x=robot_x,
+                                robot_y=robot_y,
+                                robot_yaw_deg=robot_yaw_deg,
                                 detections=detections,
                                 img_w=w,
                                 img_h=h

@@ -145,3 +145,22 @@ def should_auto_stop(state: RobotState, safety: SafetyConfig) -> bool:
     if safety.stop_on_fall and is_fallen(state, safety):
         return True
     return False
+
+
+def check_thermal_limit(temperatures: list[float], limit_c: float = 68.0) -> bool:
+    """
+    Returns True if any servo temperature meets or exceeds the critical thermal limit.
+    """
+    return any(t >= limit_c for t in temperatures)
+
+
+def check_servo_runaway(target_pos: list[float], present_pos: list[float], threshold_deg: float = 15.0) -> bool:
+    """
+    Returns True if the absolute discrepancy between target and present joint angles exceeds the threshold.
+    """
+    import math
+    for t, p in zip(target_pos, present_pos):
+        if abs(t - p) > math.radians(threshold_deg):
+            return True
+    return False
+
