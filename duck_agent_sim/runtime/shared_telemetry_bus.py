@@ -64,6 +64,31 @@ class CommandQueueStruct(ctypes.Structure):
         ("heartbeat", ctypes.c_double),
     ]
 
+class DetectionStruct(ctypes.Structure):
+    _fields_ = [
+        ("label", ctypes.c_char * 32),
+        ("confidence", ctypes.c_double),
+        ("bbox", ctypes.c_double * 4),
+        ("center", ctypes.c_double * 2),
+        ("tracking_id", ctypes.c_int),
+    ]
+
+class VisionTelemetryStruct(ctypes.Structure):
+    _fields_ = [
+        ("timestamp", ctypes.c_double),
+        ("fps", ctypes.c_double),
+        ("num_detections", ctypes.c_int),
+        ("detections", DetectionStruct * 10),
+    ]
+
+class FrameTelemetryStruct(ctypes.Structure):
+    _fields_ = [
+        ("width", ctypes.c_int),
+        ("height", ctypes.c_int),
+        ("timestamp", ctypes.c_double),
+        ("frame_data", ctypes.c_ubyte * (640 * 480 * 3)),
+    ]
+
 class SharedTelemetryBus:
     """
     Manages shared memory segments for low-latency, lock-free telemetry.
@@ -80,6 +105,8 @@ class SharedTelemetryBus:
             "servos": ctypes.sizeof(ServosTelemetryStruct),
             "state": ctypes.sizeof(RobotStateStruct),
             "command": ctypes.sizeof(CommandQueueStruct),
+            "vision": ctypes.sizeof(VisionTelemetryStruct),
+            "frame": ctypes.sizeof(FrameTelemetryStruct),
         }
         
         self.init_shm()
@@ -123,6 +150,14 @@ class SharedTelemetryBus:
     def get_command_ref(self) -> CommandQueueStruct:
         shm = self.shm_blocks["command"]
         return CommandQueueStruct.from_buffer(shm.buf)
+
+    def get_vision_ref(self) -> VisionTelemetryStruct:
+        shm = self.shm_blocks["vision"]
+        return VisionTelemetryStruct.from_buffer(shm.buf)
+
+    def get_frame_ref(self) -> FrameTelemetryStruct:
+        shm = self.shm_blocks["frame"]
+        return FrameTelemetryStruct.from_buffer(shm.buf)
 
     def close(self):
         for key, shm in list(self.shm_blocks.items()):

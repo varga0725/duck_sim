@@ -180,25 +180,33 @@ class MockDuckSimulator(DuckSimulator):
         
         # Start background vision loop
         from duck_agent_sim.vision.camera import CameraDevice
-        from duck_agent_sim.vision.frame_buffer import FrameBuffer
-        from duck_agent_sim.vision.yolo_detector import YOLODetector
-        from duck_agent_sim.vision.tracker import CentroidTracker
-        from duck_agent_sim.vision import perception_state
-        from duck_agent_sim.vision.vision_loop import VisionLoop
-        
         self.camera_device = CameraDevice(self)
-        self.frame_buffer = FrameBuffer()
-        self.detector = YOLODetector()
-        self.tracker = CentroidTracker()
-        self.vision_loop = VisionLoop(
-            self.camera_device,
-            self.frame_buffer,
-            self.detector,
-            self.tracker,
-            perception_state,
-            target_fps=10.0
-        )
-        self.vision_loop.start()
+        
+        import os
+        if os.getenv("DUCK_MULTIPROCESS", "false").lower() != "true":
+            from duck_agent_sim.vision.frame_buffer import FrameBuffer
+            from duck_agent_sim.vision.yolo_detector import YOLODetector
+            from duck_agent_sim.vision.tracker import CentroidTracker
+            from duck_agent_sim.vision import perception_state
+            from duck_agent_sim.vision.vision_loop import VisionLoop
+            
+            self.frame_buffer = FrameBuffer()
+            self.detector = YOLODetector()
+            self.tracker = CentroidTracker()
+            self.vision_loop = VisionLoop(
+                self.camera_device,
+                self.frame_buffer,
+                self.detector,
+                self.tracker,
+                perception_state,
+                target_fps=10.0
+            )
+            self.vision_loop.start()
+        else:
+            self.frame_buffer = None
+            self.detector = None
+            self.tracker = None
+            self.vision_loop = None
 
     def close(self):
         """Stops background threads and releases resources."""
@@ -356,6 +364,27 @@ class MockDuckSimulator(DuckSimulator):
                     )
                     self._desired_motion = desired
             self._advance_from_intent(desired.control, dt, desired.safety)
+            
+            import os
+            if os.getenv("DUCK_MULTIPROCESS", "false").lower() == "true":
+                now = time.time()
+                if not hasattr(self, "_last_shm_frame_time") or now - self._last_shm_frame_time >= 0.05:  # 20Hz limit
+                    self._last_shm_frame_time = now
+                    try:
+                        frame = self.camera_device.capture_frame()
+                        if frame is not None:
+                            from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
+                            import ctypes
+                            if not hasattr(self, "_shm_bus") or self._shm_bus is None:
+                                self._shm_bus = SharedTelemetryBus(create=False)
+                            frame_ref = self._shm_bus.get_frame_ref()
+                            h, w, c = frame.shape
+                            frame_ref.width = w
+                            frame_ref.height = h
+                            frame_ref.timestamp = now
+                            ctypes.memmove(frame_ref.frame_data, frame.ctypes.data, frame.size)
+                    except Exception as e:
+                        logger.error(f"Failed to write mock frame to shm: {e}")
 
     def get_state(self) -> RobotState:
         from duck_agent_sim.config import DUCK_SIM_MODE
@@ -811,25 +840,33 @@ class RealDuckSimulator(DuckSimulator):
 
         # Start background vision loop
         from duck_agent_sim.vision.camera import CameraDevice
-        from duck_agent_sim.vision.frame_buffer import FrameBuffer
-        from duck_agent_sim.vision.yolo_detector import YOLODetector
-        from duck_agent_sim.vision.tracker import CentroidTracker
-        from duck_agent_sim.vision import perception_state
-        from duck_agent_sim.vision.vision_loop import VisionLoop
-        
         self.camera_device = CameraDevice(self)
-        self.frame_buffer = FrameBuffer()
-        self.detector = YOLODetector()
-        self.tracker = CentroidTracker()
-        self.vision_loop = VisionLoop(
-            self.camera_device,
-            self.frame_buffer,
-            self.detector,
-            self.tracker,
-            perception_state,
-            target_fps=10.0
-        )
-        self.vision_loop.start()
+        
+        import os
+        if os.getenv("DUCK_MULTIPROCESS", "false").lower() != "true":
+            from duck_agent_sim.vision.frame_buffer import FrameBuffer
+            from duck_agent_sim.vision.yolo_detector import YOLODetector
+            from duck_agent_sim.vision.tracker import CentroidTracker
+            from duck_agent_sim.vision import perception_state
+            from duck_agent_sim.vision.vision_loop import VisionLoop
+            
+            self.frame_buffer = FrameBuffer()
+            self.detector = YOLODetector()
+            self.tracker = CentroidTracker()
+            self.vision_loop = VisionLoop(
+                self.camera_device,
+                self.frame_buffer,
+                self.detector,
+                self.tracker,
+                perception_state,
+                target_fps=10.0
+            )
+            self.vision_loop.start()
+        else:
+            self.frame_buffer = None
+            self.detector = None
+            self.tracker = None
+            self.vision_loop = None
 
         self._initialized = True
 
@@ -900,6 +937,28 @@ class RealDuckSimulator(DuckSimulator):
                 viewer.sync()
 
             counter += 1
+
+            # Write FPV frames to shared memory in multiprocess mode
+            import os
+            if os.getenv("DUCK_MULTIPROCESS", "false").lower() == "true":
+                now = time.time()
+                if not hasattr(self, "_last_shm_frame_time") or now - self._last_shm_frame_time >= 0.05:  # 20Hz limit
+                    self._last_shm_frame_time = now
+                    try:
+                        frame = self.camera_device.capture_frame()
+                        if frame is not None:
+                            from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
+                            import ctypes
+                            if not hasattr(self, "_shm_bus") or self._shm_bus is None:
+                                self._shm_bus = SharedTelemetryBus(create=False)
+                            frame_ref = self._shm_bus.get_frame_ref()
+                            h, w, c = frame.shape
+                            frame_ref.width = w
+                            frame_ref.height = h
+                            frame_ref.timestamp = now
+                            ctypes.memmove(frame_ref.frame_data, frame.ctypes.data, frame.size)
+                    except Exception as e:
+                        logger.error(f"Failed to write real frame to shm: {e}")
 
             self._clock.sleep_until_next_tick()
 

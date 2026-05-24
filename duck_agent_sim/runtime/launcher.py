@@ -238,12 +238,98 @@ class ProcessLauncher:
         configure_process_rt(core_id=3, policy_name="SCHED_OTHER", priority=0)
         logger.info("Vision Loop running...")
         
-        # Here we initialize YOLOv8 / Hailo-8L NPU context
+        import numpy as np
+        from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
+        from duck_agent_sim.vision.yolo_detector import YOLODetector
+        from duck_agent_sim.vision.tracker import CentroidTracker
+        from duck_agent_sim.config import DUCK_SIM_MODE
+        
+        bus = SharedTelemetryBus(create=False)
+        detector = YOLODetector()
+        tracker = CentroidTracker()
+        
+        # If in webcam mode, we need a CameraDevice to capture from cv2 VideoCapture(0)
+        camera_device = None
+        if DUCK_SIM_MODE == "webcam":
+            from duck_agent_sim.vision.camera import CameraDevice
+            camera_device = CameraDevice(None)
+            
+        last_frame_timestamp = 0.0
+        
         try:
             while self._running:
-                time.sleep(0.1)  # 10Hz perception updates
+                start_time = time.monotonic()
+                frame = None
+                timestamp = 0.0
+                
+                if DUCK_SIM_MODE == "webcam":
+                    if camera_device:
+                        frame = camera_device.capture_frame()
+                        timestamp = time.time()
+                else:
+                    # Read from shared memory
+                    try:
+                        frame_ref = bus.get_frame_ref()
+                        # Only process if we have a new frame timestamp
+                        if frame_ref.timestamp > last_frame_timestamp:
+                            last_frame_timestamp = frame_ref.timestamp
+                            timestamp = frame_ref.timestamp
+                            w = frame_ref.width
+                            h = frame_ref.height
+                            # Reconstruct numpy array from ctypes buffer
+                            frame = np.frombuffer(frame_ref.frame_data, dtype=np.uint8).reshape((h, w, 3)).copy()
+                    except Exception as e:
+                        pass
+                
+                if frame is not None:
+                    # Run YOLO detection
+                    detections = detector.detect(frame)
+                    # Run centroid tracking
+                    detections = tracker.update(detections)
+                    
+                    # Write to shared memory vision segment
+                    try:
+                        vision_ref = bus.get_vision_ref()
+                        vision_ref.timestamp = timestamp
+                        
+                        # Calculate vision FPS
+                        if not hasattr(self, "_frame_count"):
+                            self._frame_count = 0
+                            self._fps_start_time = time.time()
+                        self._frame_count += 1
+                        now = time.time()
+                        elapsed = now - self._fps_start_time
+                        if elapsed >= 2.0:
+                            self._current_fps = self._frame_count / elapsed
+                            self._frame_count = 0
+                            self._fps_start_time = now
+                        
+                        fps = getattr(self, "_current_fps", 10.0)
+                        vision_ref.fps = fps
+                        
+                        vision_ref.num_detections = min(len(detections), 10)
+                        for i, det in enumerate(detections[:10]):
+                            det_struct = vision_ref.detections[i]
+                            det_struct.label = det["label"].encode("utf-8")[:32]
+                            det_struct.confidence = float(det["confidence"])
+                            for j in range(4):
+                                det_struct.bbox[j] = float(det["bbox"][j])
+                            for j in range(2):
+                                det_struct.center[j] = float(det["center"][j])
+                            det_struct.tracking_id = int(det.get("tracking_id", -1))
+                    except Exception as e:
+                        logger.error(f"Failed to write detections to shared memory: {e}")
+                        
+                # sleep to target 10Hz (0.1s period)
+                elapsed = time.monotonic() - start_time
+                sleep_time = max(0.001, 0.1 - elapsed)
+                time.sleep(sleep_time)
         except KeyboardInterrupt:
             pass
+        finally:
+            if camera_device:
+                camera_device.close()
+            bus.close()
 
     def _run_api_bridge(self):
         # CPU 0, Low Priority System & Web APIs

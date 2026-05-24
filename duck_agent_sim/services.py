@@ -4,6 +4,23 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("duck-agent-sim")
 
+class SharedMemoryFrameBufferProxy:
+    def __init__(self, proxy):
+        self.proxy = proxy
+        
+    def get(self):
+        try:
+            frame_ref = self.proxy.bus.get_frame_ref()
+            w = frame_ref.width
+            h = frame_ref.height
+            if w <= 0 or h <= 0:
+                return None
+            import numpy as np
+            frame = np.frombuffer(frame_ref.frame_data, dtype=np.uint8).reshape((h, w, 3)).copy()
+            return frame
+        except Exception:
+            return None
+
 class SharedMemorySimulatorProxy:
     """
     Simulated or physical robot interface proxy using Shared Memory IPC.
@@ -140,6 +157,12 @@ class SharedMemorySimulatorProxy:
         if self._bus:
             self._bus.close()
             self._bus = None
+
+    @property
+    def frame_buffer(self):
+        if not hasattr(self, "_frame_buffer_proxy"):
+            self._frame_buffer_proxy = SharedMemoryFrameBufferProxy(self)
+        return self._frame_buffer_proxy
 
 
 class SimulatorProxy:
