@@ -491,3 +491,67 @@ def post_map_reset():
         return {"status": "success", "message": "Map and landmarks reset successfully"}
     else:
         raise HTTPException(status_code=501, detail="Spatial world model not initialized on active simulator")
+
+
+from pydantic import BaseModel
+
+class VoiceCommandRequest(BaseModel):
+    text: str
+
+class FollowTargetRequest(BaseModel):
+    target_label: str
+
+_duck_agent_instance = None
+
+def _get_duck_agent():
+    global _duck_agent_instance
+    if _duck_agent_instance is None:
+        from duck_agent_sim.agent.duck_agent import DuckAgent
+        from duck_agent_sim.config import BRIDGE_PORT
+        _duck_agent_instance = DuckAgent(bridge_url=f"http://127.0.0.1:{BRIDGE_PORT}")
+    return _duck_agent_instance
+
+
+@router.get("/map/elevation")
+def get_map_elevation():
+    """
+    Returns the 3D elevation (height) map matrix.
+    """
+    if hasattr(active_simulator, "spatial_model") and active_simulator.spatial_model is not None:
+        map_data = active_simulator.spatial_model.get_map_data()
+        return {"height_map": map_data.get("height_map", [])}
+    else:
+        raise HTTPException(status_code=501, detail="Spatial world model not initialized on active simulator")
+
+
+@router.post("/voice/command")
+async def post_voice_command(request: VoiceCommandRequest):
+    """
+    Accepts transcribed text, runs it through DuckAgent.process(),
+    and returns the AgentResponse.
+    """
+    agent = _get_duck_agent()
+    return await agent.process(request.text)
+
+
+@router.post("/scenario/follow-target")
+async def post_scenario_follow_target(request: FollowTargetRequest):
+    """
+    Configures and starts the vision-guided target follower with a specified label.
+    """
+    from duck_agent_sim.vision import follower
+    safety = SafetyConfig()
+    assessment, recovered_state = await _preflight_recovery(safety)
+    if recovered_state is not None:
+        return {
+            "status": "blocked_by_safety",
+            "follower": follower.get_status(),
+            "state": recovered_state,
+            "safety_intervention": "preflight_recovered",
+            "safety_reasons": assessment.reasons,
+        }
+    
+    follower.configure({"target_label": request.target_label})
+    follower.start()
+    return {"status": "started", "follower": follower.get_status()}
+

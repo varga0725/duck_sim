@@ -13,9 +13,10 @@ class StateEstimator:
     - Forward kinematics velocity (based on stance leg joint speeds)
     - Foot contact switches (to weigh stance vs swing legs)
     """
-    def __init__(self, dt: float = 0.02, alpha: float = 0.15):
+    def __init__(self, dt: float = 0.02, alpha: float = 0.15, beta: float = 0.10):
         self.dt = dt
         self.alpha = alpha  # Complementary filter weight for kinematics vs accelerometer
+        self.beta = beta    # Complementary filter weight for visual odometry
         
         # State variables
         self.velocity = np.zeros(3, dtype=np.float32)  # [Vx, Vy, Vz] in world/body frame
@@ -28,10 +29,14 @@ class StateEstimator:
         self.thigh_length = 0.18
         self.shin_length = 0.18
         self.foot_offset = 0.05
+        
+        # Store previous simulation position for visual odometry estimation
+        self._prev_sim_pos = None
 
     def reset(self, initial_position: Tuple[float, float, float] = (0.0, 0.0, 0.41)):
         self.velocity = np.zeros(3, dtype=np.float32)
         self.position = np.array(initial_position, dtype=np.float32)
+        self._prev_sim_pos = None
         logger.info(f"State Estimator reset to position: {initial_position}")
 
     def _rotate_vector_by_quaternion(self, v: np.ndarray, q: Tuple[float, float, float, float]) -> np.ndarray:
@@ -92,6 +97,35 @@ class StateEstimator:
             
         return np.array([vx, vy, vz], dtype=np.float32)
 
+    def estimate_visual_odometry(self, frame_prev: Any = None, frame_curr: Any = None) -> np.ndarray:
+        """
+        Estimates visual odometry delta displacement [dx, dy, dz] in the world frame.
+        In mock mode, queries the active simulator's position and adds minor Gaussian noise.
+        """
+        curr_sim_pos = None
+        try:
+            from duck_agent_sim.simulator.instance import active_simulator
+            state = active_simulator.get_state()
+            if state and hasattr(state, "position"):
+                curr_sim_pos = np.array(state.position, dtype=np.float32)
+        except Exception:
+            pass
+
+        if curr_sim_pos is not None:
+            if self._prev_sim_pos is None:
+                self._prev_sim_pos = curr_sim_pos
+                delta = np.zeros(3, dtype=np.float32)
+            else:
+                delta = curr_sim_pos - self._prev_sim_pos
+                self._prev_sim_pos = curr_sim_pos
+        else:
+            # Fallback when simulator state isn't available
+            delta = self.velocity * self.dt
+
+        # Add minor Gaussian noise to emulate visual drift
+        noise = np.random.normal(0, 0.002, size=3).astype(np.float32)
+        return delta + noise
+
     def update(self, 
                imu_accel: Tuple[float, float, float], 
                imu_quat: Tuple[float, float, float, float],
@@ -100,7 +134,9 @@ class StateEstimator:
                left_joint_angles: np.ndarray,
                left_joint_vel: np.ndarray,
                right_joint_angles: np.ndarray,
-               right_joint_vel: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+               right_joint_vel: np.ndarray,
+               frame_prev: Any = None,
+               frame_curr: Any = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Performs a single estimation step.
         Returns: (velocity_3d, position_3d)
@@ -125,16 +161,20 @@ class StateEstimator:
             v_kin += self._calculate_kinematic_velocity(right_joint_angles, right_joint_vel, is_left=False)
             active_contacts += 1
             
+        # 3.5. Estimate Visual Odometry
+        vo_translation = self.estimate_visual_odometry(frame_prev, frame_curr)
+        v_vo = vo_translation / self.dt
+        
         # 4. Complementary Fusion
         if active_contacts > 0:
             # Average kinematic velocity proposal across contacts
             v_kin_avg = v_kin / active_contacts
             # Keep Z height estimator bounded using kinematic Z speed
-            # Filter Vx, Vy, Vz
-            self.velocity = (1.0 - self.alpha) * v_inertial + self.alpha * v_kin_avg
+            # Filter Vx, Vy, Vz combining inertial, kinematics, and visual odometry
+            self.velocity = (1.0 - self.alpha - self.beta) * v_inertial + self.alpha * v_kin_avg + self.beta * v_vo
         else:
-            # No contacts (aerial phase or fall). Fall back 100% to inertial integration
-            self.velocity = v_inertial
+            # No contacts (aerial phase or fall). Combine inertial and visual odometry
+            self.velocity = (1.0 - self.beta) * v_inertial + self.beta * v_vo
             
         # 5. Position integration
         self.position += self.velocity * self.dt

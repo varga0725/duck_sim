@@ -26,6 +26,9 @@ class SpatialWorldModel:
         # Initialize grid (0 = Unknown)
         self.grid = [[0 for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         
+        # Initialize height map (0.0 = ground level)
+        self.height_map = [[0.0 for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        
         # Landmarks: label -> {x, y, confidence, last_updated}
         self.landmarks: Dict[str, Dict[str, Any]] = {}
         
@@ -44,15 +47,16 @@ class SpatialWorldModel:
         self.fov_x_rad = math.radians(60.0) # Assume 60 deg horizontal FOV
 
     def reset(self):
-        """Resets the occupancy grid and semantic landmarks."""
+        """Resets the occupancy grid, height map, and semantic landmarks."""
         self.grid = [[0 for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.height_map = [[0.0 for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.landmarks.clear()
         logger.info("Spatial World Model reset.")
 
     def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
         """Converts world coordinates (x, y) in meters to grid indices (gx, gy)."""
-        gx = int(x / self.resolution) + self.half_grid
-        gy = int(y / self.resolution) + self.half_grid
+        gx = int(math.floor(x / self.resolution)) + self.half_grid
+        gy = int(math.floor(y / self.resolution)) + self.half_grid
         # Clamp to grid bounds
         gx = max(0, min(self.grid_size - 1, gx))
         gy = max(0, min(self.grid_size - 1, gy))
@@ -111,8 +115,15 @@ class SpatialWorldModel:
             x_obj = robot_x + distance * math.cos(total_angle)
             y_obj = robot_y + distance * math.sin(total_angle)
             
+            # Compute 3D elevation height Z using camera pitch geometry
+            ey = (img_h / 2.0) - cy
+            fovy_rad = math.radians(45.0)
+            pitch_rad = (ey / (img_h / 2.0)) * (fovy_rad / 2.0)
+            z_camera = 0.41 # Camera height in meters
+            z_obj = z_camera + distance * math.sin(pitch_rad)
+            
             # Harden against infinite or NaN coordinates
-            if not math.isfinite(x_obj) or not math.isfinite(y_obj):
+            if not math.isfinite(x_obj) or not math.isfinite(y_obj) or not math.isfinite(z_obj):
                 continue
                 
             # 3. Find if there is an existing instance of this class within 0.5m
@@ -134,6 +145,8 @@ class SpatialWorldModel:
                 alpha = 0.20 # Smooth factor (weight of new observation)
                 self.landmarks[matched_inst_id]["x"] = (1 - alpha) * self.landmarks[matched_inst_id]["x"] + alpha * x_obj
                 self.landmarks[matched_inst_id]["y"] = (1 - alpha) * self.landmarks[matched_inst_id]["y"] + alpha * y_obj
+                prev_z = self.landmarks[matched_inst_id].get("z", 0.0)
+                self.landmarks[matched_inst_id]["z"] = (1 - alpha) * prev_z + alpha * z_obj
                 self.landmarks[matched_inst_id]["confidence"] = max(self.landmarks[matched_inst_id]["confidence"], conf)
                 self.landmarks[matched_inst_id]["last_updated"] = time.time()
                 matched_instances.add(matched_inst_id)
@@ -146,6 +159,7 @@ class SpatialWorldModel:
                 self.landmarks[new_inst_id] = {
                     "x": x_obj,
                     "y": y_obj,
+                    "z": z_obj,
                     "confidence": conf,
                     "last_updated": time.time()
                 }
@@ -155,13 +169,14 @@ class SpatialWorldModel:
             tgx, tgy = self.world_to_grid(x_obj, y_obj)
             self._raycast_free_line(rgx, rgy, tgx, tgy)
             
-            # 5. Mark target cell and neighbors as occupied
+            # 5. Mark target cell and neighbors as occupied and record height
             for dy in [-1, 0, 1]:
                 for dx in [-1, 0, 1]:
                     ny = tgy + dy
                     nx = tgx + dx
                     if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
                         self.grid[ny][nx] = 2
+                        self.height_map[ny][nx] = max(self.height_map[ny][nx], float(z_obj))
                         
         # 6. Decay and prune landmarks not matched in this frame
         current_time = time.time()
@@ -276,5 +291,6 @@ class SpatialWorldModel:
             "grid_size": self.grid_size,
             "resolution": self.resolution,
             "landmarks": data_landmarks,
-            "grid": self.grid
+            "grid": self.grid,
+            "height_map": self.height_map
         }

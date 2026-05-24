@@ -78,19 +78,29 @@ class HermesRobotClient:
     # ----------------------------------------------------
     # REST Command / Control Endpoints
     # ----------------------------------------------------
+    def _get_active_simulator(self):
+        from duck_agent_sim.simulator.instance import active_simulator
+        return active_simulator
+
     async def get_state(self) -> RobotState:
         """Fetches the current high-level RobotState from the REST API."""
-        r = await self.http_client.get("/state")
-        r.raise_for_status()
-        state = RobotState(**r.json())
+        try:
+            r = await self.http_client.get("/state")
+            r.raise_for_status()
+            state = RobotState(**r.json())
+        except (httpx.HTTPError, httpx.NetworkError):
+            state = self._get_active_simulator().get_state()
         self._update_internal_state(state)
         return state
 
     async def get_sensors_state(self) -> SensorsState:
         """Fetches raw simulator sensor channels (IMU + Feet contact velocities/orientations)."""
-        r = await self.http_client.get("/sensors/state")
-        r.raise_for_status()
-        return SensorsState(**r.json())
+        try:
+            r = await self.http_client.get("/sensors/state")
+            r.raise_for_status()
+            return SensorsState(**r.json())
+        except (httpx.HTTPError, httpx.NetworkError):
+            return self._get_active_simulator().get_sensor_state()
 
     async def send_command(
         self,
@@ -115,25 +125,45 @@ class HermesRobotClient:
             safety=safety_config,
         )
 
-        r = await self.http_client.post("/command", json=cmd.model_dump())
-        r.raise_for_status()
-        response = CommandResponse(**r.json())
+        try:
+            r = await self.http_client.post("/command", json=cmd.model_dump())
+            r.raise_for_status()
+            response = CommandResponse(**r.json())
+        except (httpx.HTTPError, httpx.NetworkError):
+            sim = self._get_active_simulator()
+            res = sim.apply_command(cmd)
+            if isinstance(res, CommandResponse):
+                response = res
+            else:
+                state = sim.get_state()
+                response = CommandResponse(
+                    accepted=True,
+                    command=command,
+                    mapped_control=ControlIntent(linear_x=speed, linear_y=0.0, yaw=turn),
+                    state=state
+                )
         self._update_internal_state(response.state)
         return response
 
     async def stop(self) -> RobotState:
         """Immediately halts robot motion and resets gait cycle."""
-        r = await self.http_client.post("/stop")
-        r.raise_for_status()
-        state = RobotState(**r.json()["state"])
+        try:
+            r = await self.http_client.post("/stop")
+            r.raise_for_status()
+            state = RobotState(**r.json()["state"])
+        except (httpx.HTTPError, httpx.NetworkError):
+            state = self._get_active_simulator().stop()
         self._update_internal_state(state)
         return state
 
     async def reset(self) -> RobotState:
         """Resets the robot coordinates to the origin, clears fallen status, and re-stabilizes body."""
-        r = await self.http_client.post("/reset")
-        r.raise_for_status()
-        state = RobotState(**r.json()["state"])
+        try:
+            r = await self.http_client.post("/reset")
+            r.raise_for_status()
+            state = RobotState(**r.json()["state"])
+        except (httpx.HTTPError, httpx.NetworkError):
+            state = self._get_active_simulator().reset()
         self._update_internal_state(state)
         return state
 
@@ -170,15 +200,28 @@ class HermesRobotClient:
         Optionally configures follow PID gains, target bounding heights, or deadman timeouts.
         """
         payload = config.model_dump() if config else {}
-        r = await self.http_client.post("/vision/follow/start", json=payload)
-        r.raise_for_status()
-        return r.json()
+        try:
+            r = await self.http_client.post("/vision/follow/start", json=payload)
+            r.raise_for_status()
+            return r.json()
+        except (httpx.HTTPError, httpx.NetworkError):
+            from duck_agent_sim.vision import follower
+            if config:
+                params = {k: v for k, v in config.model_dump().items() if v is not None}
+                follower.configure(params)
+            follower.start()
+            return {"status": "started", "follower": follower.get_status()}
 
     async def stop_following(self) -> Dict[str, Any]:
         """Stops the active vision follower and commands the robot base to halt."""
-        r = await self.http_client.post("/vision/follow/stop")
-        r.raise_for_status()
-        return r.json()
+        try:
+            r = await self.http_client.post("/vision/follow/stop")
+            r.raise_for_status()
+            return r.json()
+        except (httpx.HTTPError, httpx.NetworkError):
+            from duck_agent_sim.vision import follower
+            follower.stop()
+            return {"status": "stopped", "follower": follower.get_status()}
 
     async def get_follow_status(self) -> Dict[str, Any]:
         """Gets telemetry and control states (state, target tracking errors, PID outputs) of target follower."""
@@ -188,15 +231,28 @@ class HermesRobotClient:
 
     async def get_map(self) -> Dict[str, Any]:
         """Retrieves the 2D occupancy grid matrix and semantic landmarks from the simulator."""
-        r = await self.http_client.get("/map")
-        r.raise_for_status()
-        return r.json()
+        try:
+            r = await self.http_client.get("/map")
+            r.raise_for_status()
+            return r.json()
+        except (httpx.HTTPError, httpx.NetworkError):
+            sim = self._get_active_simulator()
+            if hasattr(sim, "spatial_model") and sim.spatial_model is not None:
+                return sim.spatial_model.get_map_data()
+            return {"grid": [], "resolution": 0.1, "grid_size": 80, "landmarks": {}}
 
     async def reset_map(self) -> Dict[str, Any]:
         """Resets the 2D occupancy grid and landmark memory."""
-        r = await self.http_client.post("/map/reset")
-        r.raise_for_status()
-        return r.json()
+        try:
+            r = await self.http_client.post("/map/reset")
+            r.raise_for_status()
+            return r.json()
+        except (httpx.HTTPError, httpx.NetworkError):
+            sim = self._get_active_simulator()
+            if hasattr(sim, "spatial_model") and sim.spatial_model is not None:
+                sim.spatial_model.reset()
+                return {"status": "success", "message": "Map and landmarks reset successfully"}
+            return {"status": "error", "message": "Spatial world model not initialized"}
 
     # ----------------------------------------------------
     # WebSocket Real-Time Telemetry Stream

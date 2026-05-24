@@ -1,7 +1,7 @@
 import time
 import logging
 import math
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 from duck_agent_sim.schemas import RobotCommand, RobotState, SafetyConfig
 
@@ -437,3 +437,112 @@ class ScriptedAgent:
         
         logger.info("Obstacle Avoidance scenario completed.")
         return history
+
+    def run_navigate_map(self, target_world_coords: Tuple[float, float]) -> List[RobotState]:
+        """
+        Executes global navigation to target_world_coords:
+        - Plans a global path using AStarPlanner.
+        - Commands the robot to follow the waypoints using PurePursuitTracker.
+        - Runs in a loop, polling state and applying steering controls.
+        """
+        logger.info(f"Starting Navigate Map scenario to target {target_world_coords}...")
+        
+        # Reset simulator and trigger initial vision update
+        self.simulator.reset()
+        self._trigger_local_vision()
+        
+        state = self.simulator.get_state()
+        history = [state]
+        
+        if state.fallen:
+            logger.info("Robot is fallen. Issuing reset command first...")
+            self.simulator.reset()
+            state = self.simulator.get_state()
+            history.append(state)
+            
+        spatial_model = getattr(self.simulator, "spatial_model", None)
+        if spatial_model is None:
+            # Fallback if no spatial model: straight line
+            logger.warning("Spatial model not found on simulator. Executing straight command fallback.")
+            cmd = RobotCommand(
+                command="walk_forward",
+                speed=0.25,
+                turn=0.0,
+                duration_sec=2.0,
+                safety=SafetyConfig()
+            )
+            res = self.simulator.apply_command(cmd)
+            history.append(res.state)
+            return history
+            
+        from duck_agent_sim.simulator.path_planner import AStarPlanner, PurePursuitTracker
+        
+        # 1. Plan path using A*
+        start_coords = (state.position[0], state.position[1])
+        planner = AStarPlanner(spatial_model)
+        path = planner.plan_path(start_coords, target_world_coords)
+        
+        if not path:
+            logger.warning("No path found by A*. Aborting.")
+            return history
+            
+        tracker = PurePursuitTracker(lookahead_distance=0.4, max_speed=0.25, max_yaw_speed=0.5)
+        
+        # 2. Follow waypoints
+        max_steps = 40  # prevent infinite loops
+        step_duration = 0.5
+        
+        for step in range(max_steps):
+            state = self.simulator.get_state()
+            if state.fallen:
+                logger.error("Robot fell during navigate map scenario! Aborting.")
+                break
+                
+            # Get current pose
+            pose = (state.position[0], state.position[1], state.orientation.yaw_deg)
+            
+            # Compute steering command
+            linear_x, yaw_rate, arrived = tracker.get_steering_command(pose, path)
+            
+            if arrived:
+                logger.info("Destination reached successfully.")
+                break
+                
+            # Map linear_x and yaw_rate to RobotCommand
+            if linear_x == 0.0:
+                cmd_type = "turn_left" if yaw_rate > 0 else "turn_right"
+                cmd = RobotCommand(
+                    command=cmd_type,
+                    speed=0.0,
+                    turn=yaw_rate,
+                    duration_sec=step_duration,
+                    safety=SafetyConfig()
+                )
+            else:
+                cmd = RobotCommand(
+                    command="walk_forward",
+                    speed=linear_x,
+                    turn=yaw_rate,
+                    duration_sec=step_duration,
+                    safety=SafetyConfig()
+                )
+                
+            res = self.simulator.apply_command(cmd)
+            history.append(res.state)
+            self._trigger_local_vision()
+            
+        # Final stop
+        cmd_stop = RobotCommand(
+            command="stop",
+            speed=0.0,
+            turn=0.0,
+            duration_sec=1.0,
+            safety=SafetyConfig()
+        )
+        res = self.simulator.apply_command(cmd_stop)
+        history.append(res.state)
+        self._trigger_local_vision()
+        
+        logger.info("Navigate Map scenario completed.")
+        return history
+
