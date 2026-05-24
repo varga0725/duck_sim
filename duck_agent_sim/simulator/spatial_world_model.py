@@ -72,6 +72,9 @@ class SpatialWorldModel:
         rgx, rgy = self.world_to_grid(robot_x, robot_y)
         self.grid[rgy][rgx] = 1 # Mark robot spot as free
         
+        # Track matched instances in this update frame
+        matched_instances = set()
+        
         # 2. Process each detection
         for det in detections:
             label = det.get("label", "").lower()
@@ -108,20 +111,45 @@ class SpatialWorldModel:
             x_obj = robot_x + distance * math.cos(total_angle)
             y_obj = robot_y + distance * math.sin(total_angle)
             
-            # 3. Update Landmark Memory with Exponential Moving Average (EMA) filtering
-            if label not in self.landmarks:
-                self.landmarks[label] = {
+            # Harden against infinite or NaN coordinates
+            if not math.isfinite(x_obj) or not math.isfinite(y_obj):
+                continue
+                
+            # 3. Find if there is an existing instance of this class within 0.5m
+            matched_inst_id = None
+            min_dist = 0.5
+            for inst_id, lm in self.landmarks.items():
+                # Ignore base keys (which don't contain a _) during clustering
+                if "_" not in inst_id:
+                    continue
+                base_label = inst_id.split('_')[0]
+                if base_label == label:
+                    dist = math.hypot(lm["x"] - x_obj, lm["y"] - y_obj)
+                    if dist < min_dist:
+                        min_dist = dist
+                        matched_inst_id = inst_id
+            
+            if matched_inst_id is not None:
+                # Update existing instance with Exponential Moving Average (EMA) filtering
+                alpha = 0.20 # Smooth factor (weight of new observation)
+                self.landmarks[matched_inst_id]["x"] = (1 - alpha) * self.landmarks[matched_inst_id]["x"] + alpha * x_obj
+                self.landmarks[matched_inst_id]["y"] = (1 - alpha) * self.landmarks[matched_inst_id]["y"] + alpha * y_obj
+                self.landmarks[matched_inst_id]["confidence"] = max(self.landmarks[matched_inst_id]["confidence"], conf)
+                self.landmarks[matched_inst_id]["last_updated"] = time.time()
+                matched_instances.add(matched_inst_id)
+            else:
+                # Create a new unique instance ID (e.g. chair_1, chair_2, ...)
+                inst_num = 1
+                while f"{label}_{inst_num}" in self.landmarks:
+                    inst_num += 1
+                new_inst_id = f"{label}_{inst_num}"
+                self.landmarks[new_inst_id] = {
                     "x": x_obj,
                     "y": y_obj,
                     "confidence": conf,
                     "last_updated": time.time()
                 }
-            else:
-                alpha = 0.20 # Smooth factor (weight of new observation)
-                self.landmarks[label]["x"] = (1 - alpha) * self.landmarks[label]["x"] + alpha * x_obj
-                self.landmarks[label]["y"] = (1 - alpha) * self.landmarks[label]["y"] + alpha * y_obj
-                self.landmarks[label]["confidence"] = max(self.landmarks[label]["confidence"], conf)
-                self.landmarks[label]["last_updated"] = time.time()
+                matched_instances.add(new_inst_id)
                 
             # 4. Raycast in Occupancy Grid (Bresenham's algorithm)
             tgx, tgy = self.world_to_grid(x_obj, y_obj)
@@ -134,6 +162,65 @@ class SpatialWorldModel:
                     nx = tgx + dx
                     if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
                         self.grid[ny][nx] = 2
+                        
+        # 6. Decay and prune landmarks not matched in this frame
+        current_time = time.time()
+        yaw_rad = math.radians(robot_yaw_deg)
+        fov_half = self.fov_x_rad / 2.0
+        max_dist = 3.5
+        
+        to_remove = []
+        for inst_id, lm in self.landmarks.items():
+            # Skip base keys from decay (we'll rebuild them later)
+            if "_" not in inst_id:
+                continue
+                
+            if inst_id in matched_instances:
+                continue
+                
+            # Calculate distance and bearing to check if it's in the camera's FOV
+            dx = lm["x"] - robot_x
+            dy = lm["y"] - robot_y
+            dist = math.hypot(dx, dy)
+            
+            in_fov = False
+            if dist <= max_dist:
+                angle_to_obj = math.atan2(dy, dx)
+                bearing = angle_to_obj - yaw_rad
+                # Normalize bearing to [-pi, pi]
+                bearing = (bearing + math.pi) % (2.0 * math.pi) - math.pi
+                if abs(bearing) <= fov_half:
+                    in_fov = True
+                    
+            time_since_update = current_time - lm["last_updated"]
+            if in_fov:
+                lm["confidence"] -= 0.15 # Decay faster if we should see it but don't
+            elif time_since_update > 15.0:
+                lm["confidence"] -= 0.05 # Slower decay if out-of-sight
+                
+            if lm["confidence"] < 0.1:
+                to_remove.append(inst_id)
+                
+        for inst_id in to_remove:
+            del self.landmarks[inst_id]
+            logger.info(f"Pruned stale landmark: {inst_id}")
+            
+        # Rebuild/Update base class keys (without underscore) in the main dictionary
+        # First delete any existing base keys
+        for k in list(self.landmarks.keys()):
+            if "_" not in k:
+                del self.landmarks[k]
+                
+        # Group instances by class to find the best instance
+        by_class = {}
+        for inst_id, val in self.landmarks.items():
+            label = inst_id.split('_')[0]
+            if label not in by_class or val["confidence"] > by_class[label]["confidence"]:
+                by_class[label] = val
+                
+        # Inject base keys back in
+        for label, val in by_class.items():
+            self.landmarks[label] = val
 
     def _raycast_free_line(self, x0: int, y0: int, x1: int, y1: int):
         """
@@ -170,9 +257,24 @@ class SpatialWorldModel:
 
     def get_map_data(self) -> Dict[str, Any]:
         """Returns the serialized map and landmarks."""
+        # Include all specific instances
+        data_landmarks = dict(self.landmarks)
+        
+        # For legacy compatibility, also map each class label to its best (most confident) instance
+        by_class = {}
+        for inst_id, val in self.landmarks.items():
+            label = inst_id.split('_')[0] if '_' in inst_id else inst_id
+            if label not in by_class or val["confidence"] > by_class[label]["confidence"]:
+                by_class[label] = val
+                
+        # Add the legacy base labels to serialization
+        for label, val in by_class.items():
+            if label not in data_landmarks:
+                data_landmarks[label] = val
+                
         return {
             "grid_size": self.grid_size,
             "resolution": self.resolution,
-            "landmarks": self.landmarks,
+            "landmarks": data_landmarks,
             "grid": self.grid
         }

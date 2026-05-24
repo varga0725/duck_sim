@@ -189,25 +189,90 @@ class YOLODetector:
         return detections
 
     def _detect_mock(self) -> list:
-        """Generates deterministic mock detections matching the mock classroom frame shapes."""
-        sim_time = time.time()
-        offset_x = int(30 * math.sin(sim_time * 0.5))
-        person_x = int(450 + 40 * math.cos(sim_time * 0.3))
-        
-        return [
-            {
-                "label": "chair",
-                "confidence": 0.88,
-                "bbox": [float(150 + offset_x), 280.0, float(220 + offset_x), 400.0],
-                "center": [float(185 + offset_x), 340.0],
-                "tracking_id": -1
-            },
-            {
-                "label": "person",
-                "confidence": 0.93,
-                "bbox": [float(person_x - 40), 170.0, float(person_x + 40), 380.0],
-                "center": [float(person_x), 275.0],
-                "tracking_id": -1
-            }
+        """Generates dynamic mock detections by projecting static classroom landmarks based on the robot's pose."""
+        try:
+            from duck_agent_sim.simulator.instance import active_simulator
+            state = active_simulator.get_state()
+            robot_x = state.position[0]
+            robot_y = state.position[1]
+            robot_yaw_deg = state.orientation.yaw_deg
+        except Exception:
+            robot_x = 0.0
+            robot_y = 0.0
+            robot_yaw_deg = 0.0
+
+        # Define static mock objects in world space: (label, x, y, real_height)
+        static_objects = [
+            ("chair", 1.5, 0.5, 0.6),
+            ("sports_ball", 1.0, -0.3, 0.22),
+            ("person", 2.5, 0.0, 1.7)
         ]
+
+        detections = []
+        img_w = 640
+        img_h = 480
+        
+        # Camera model specs
+        fovy = 45.0
+        focal_length = img_h / (2.0 * math.tan(math.radians(fovy) / 2.0)) # ~579.4
+        fov_x_rad = math.radians(60.0)
+        fov_half = fov_x_rad / 2.0
+        
+        yaw_rad = math.radians(robot_yaw_deg)
+        
+        for label, obj_x, obj_y, real_h in static_objects:
+            dx = obj_x - robot_x
+            dy = obj_y - robot_y
+            distance = math.hypot(dx, dy)
+            
+            # Skip if object is too close (behind near plane) or too far to detect
+            if distance < 0.1 or distance > 5.0:
+                continue
+                
+            # Angle of object in world frame
+            angle_to_obj = math.atan2(dy, dx)
+            
+            # Bearing relative to robot's heading
+            bearing = angle_to_obj - yaw_rad
+            # Normalize bearing to [-pi, pi]
+            bearing = (bearing + math.pi) % (2.0 * math.pi) - math.pi
+            
+            # Check if within horizontal FOV
+            if abs(bearing) <= fov_half:
+                # Calculate horizontal screen position
+                cx = (img_w / 2.0) - (bearing / fov_half) * (img_w / 2.0)
+                
+                # Calculate vertical box size using pinhole height projection
+                box_height = (focal_length * real_h) / distance
+                
+                # Estimate vertical screen center (closer objects sit lower in the frame)
+                cy = 240.0 + (100.0 / distance)
+                
+                # Clamp vertical center to prevent box going completely off-screen
+                cy = max(box_height / 2.0 + 10, min(img_h - box_height / 2.0 - 10, cy))
+                
+                # Assume a fixed aspect ratio of 0.8 for width/height
+                box_width = box_height * 0.8
+                
+                x1 = cx - box_width / 2.0
+                y1 = cy - box_height / 2.0
+                x2 = cx + box_width / 2.0
+                y2 = cy + box_height / 2.0
+                
+                # Clamp bounding boxes to image frame
+                x1 = max(0.0, min(float(img_w), x1))
+                y1 = max(0.0, min(float(img_h), y1))
+                x2 = max(0.0, min(float(img_w), x2))
+                y2 = max(0.0, min(float(img_h), y2))
+                
+                if x2 > x1 and y2 > y1:
+                    detections.append({
+                        "label": label,
+                        "confidence": 0.90,
+                        "bbox": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)],
+                        "center": [round(cx, 1), round(cy, 1)],
+                        "tracking_id": -1
+                    })
+                    
+        return detections
 

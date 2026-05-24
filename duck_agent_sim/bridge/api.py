@@ -309,6 +309,68 @@ async def post_walk_square():
         safety_reasons=safety_reasons,
     )
 
+@router.post("/scenario/patrol-landmarks", response_model=ScenarioResponse)
+async def post_patrol_landmarks():
+    """
+    Executes the landmark discovery and patrol scenario.
+    """
+    from duck_agent_sim.agent.scripted_agent import ScriptedAgent
+    from duck_agent_sim.simulator.instance import active_simulator
+    import asyncio
+    
+    agent = ScriptedAgent(active_simulator)
+    loop = asyncio.get_running_loop()
+    history = await loop.run_in_executor(None, agent.run_patrol_landmarks)
+    
+    steps_res = []
+    for state in history[1:]: # skip initial state
+        steps_res.append(
+            ScenarioStepResponse(
+                command=state.last_command or "unknown",
+                duration_sec=0.5,
+                state=state
+            )
+        )
+        
+    return ScenarioResponse(
+        scenario="patrol_landmarks",
+        success=all(not s.state.fallen for s in steps_res),
+        steps_executed=steps_res,
+        safety_intervention=None,
+        safety_reasons=[]
+    )
+
+@router.post("/scenario/obstacle-avoidance", response_model=ScenarioResponse)
+async def post_obstacle_avoidance(duration_sec: float = 5.0):
+    """
+    Executes the reactive obstacle avoidance scenario using the occupancy grid.
+    """
+    from duck_agent_sim.agent.scripted_agent import ScriptedAgent
+    from duck_agent_sim.simulator.instance import active_simulator
+    import asyncio
+    
+    agent = ScriptedAgent(active_simulator)
+    loop = asyncio.get_running_loop()
+    history = await loop.run_in_executor(None, agent.run_obstacle_avoidance, duration_sec)
+    
+    steps_res = []
+    for state in history[1:]: # skip initial state
+        steps_res.append(
+            ScenarioStepResponse(
+                command=state.last_command or "unknown",
+                duration_sec=0.5,
+                state=state
+            )
+        )
+        
+    return ScenarioResponse(
+        scenario="obstacle_avoidance",
+        success=all(not s.state.fallen for s in steps_res),
+        steps_executed=steps_res,
+        safety_intervention=None,
+        safety_reasons=[]
+    )
+
 import io
 import cv2
 from fastapi.responses import StreamingResponse

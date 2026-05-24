@@ -112,3 +112,121 @@ def test_spatial_world_model_landmark_ema_filter():
     assert chair_updated["confidence"] == 0.9
     assert chair_updated["x"] != chair_initial["x"]
     assert chair_updated["y"] != chair_initial["y"]
+
+def test_spatial_world_model_multi_instance():
+    model = SpatialWorldModel(size_m=8.0, resolution=0.1)
+    
+    # Update with first chair detection
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[{"label": "chair", "confidence": 0.85, "bbox": [100, 100, 200, 300], "center": [320, 240]}],
+        img_w=640,
+        img_h=480
+    )
+    
+    # We should have chair_1 and legacy fallback chair
+    assert "chair_1" in model.landmarks
+    assert "chair" in model.get_map_data()["landmarks"]
+    chair_1_pos = (model.landmarks["chair_1"]["x"], model.landmarks["chair_1"]["y"])
+    
+    # Add a second chair far away (offsetted box center)
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[{"label": "chair", "confidence": 0.90, "bbox": [100, 100, 200, 300], "center": [100, 240]}], # far left
+        img_w=640,
+        img_h=480
+    )
+    
+    # We should have two instances now: chair_1 and chair_2
+    assert "chair_1" in model.landmarks
+    assert "chair_2" in model.landmarks
+    assert model.landmarks["chair_2"]["x"] != chair_1_pos[0]
+
+def test_spatial_world_model_confidence_decay_and_pruning():
+    model = SpatialWorldModel(size_m=8.0, resolution=0.1)
+    
+    # Add chair instance
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[{"label": "chair", "confidence": 0.5, "bbox": [100, 100, 200, 300], "center": [320, 240]}],
+        img_w=640,
+        img_h=480
+    )
+    assert "chair_1" in model.landmarks
+    initial_conf = model.landmarks["chair_1"]["confidence"]
+    
+    # Trigger updates facing the landmark, but with NO detections -> should decay confidence
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[], # no detections in FOV
+        img_w=640,
+        img_h=480
+    )
+    
+    # Confidence should decay from 0.5 by 0.15 to 0.35
+    assert model.landmarks["chair_1"]["confidence"] < initial_conf
+    
+    # Update again to trigger pruning (< 0.1)
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[],
+        img_w=640,
+        img_h=480
+    )
+    assert "chair_1" in model.landmarks
+    
+    model.update(
+        robot_x=0.0,
+        robot_y=0.0,
+        robot_yaw_deg=0.0,
+        detections=[],
+        img_w=640,
+        img_h=480
+    )
+    # Confidence should drop below 0.1 -> pruned
+    assert "chair_1" not in model.landmarks
+
+def test_mock_yolo_projection():
+    from duck_agent_sim.vision.yolo_detector import YOLODetector
+    
+    detector = YOLODetector()
+    
+    # 1. At origin (0,0) facing forward (yaw=0)
+    dets_forward = detector._detect_mock()
+    labels_forward = [d["label"] for d in dets_forward]
+    assert "chair" in labels_forward
+    assert "sports_ball" in labels_forward
+    assert "person" in labels_forward
+    
+    # 2. Mock turned state where chair is outside horizontal FOV
+    from unittest.mock import MagicMock
+    import duck_agent_sim.simulator.instance as inst
+    
+    orig_sim = inst.active_simulator
+    mock_sim = MagicMock()
+    mock_state = MagicMock()
+    mock_state.position = (0.0, 0.0, 0.15)
+    mock_state.orientation.yaw_deg = -30.0
+    mock_sim.get_state.return_value = mock_state
+    inst.active_simulator = mock_sim
+    
+    try:
+        dets_turned = detector._detect_mock()
+        labels_turned = [d["label"] for d in dets_turned]
+        
+        # Chair should not be detected since it went out of FOV
+        assert "chair" not in labels_turned
+        # Sports ball should still be detected
+        assert "sports_ball" in labels_turned
+    finally:
+        inst.active_simulator = orig_sim

@@ -171,3 +171,23 @@ def test_api_walk_square_scenario(client):
         assert data["scenario"] == "walk_square"
         assert data["success"] is True
         assert len(data["steps_executed"]) == 8
+
+def test_api_patrol_landmarks_scenario(client):
+    response = client.get("/health")
+    if response.json()["sim_mode"] == "mock":
+        res = client.post("/scenario/patrol-landmarks")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["scenario"] == "patrol_landmarks"
+        assert data["success"] is True
+        assert len(data["steps_executed"]) > 0
+
+def test_api_obstacle_avoidance_scenario(client):
+    response = client.get("/health")
+    if response.json()["sim_mode"] == "mock":
+        res = client.post("/scenario/obstacle-avoidance?duration_sec=1.5")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["scenario"] == "obstacle_avoidance"
+        assert data["success"] is True
+        assert len(data["steps_executed"]) > 0

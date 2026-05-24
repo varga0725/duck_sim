@@ -112,15 +112,25 @@ class LocalDuckAgent:
                 try:
                     map_data = await self.client.get_map()
                     landmarks = map_data.get("landmarks", {})
-                    if target_label in landmarks:
-                        # landmark exists in spatial world model! Navigate locally.
-                        lm = landmarks[target_label]
+                    
+                    # Get current state
+                    state = await self.client.get_state()
+                    rx, ry, _ = state.position
+                    ryaw = state.orientation.yaw_deg
+                    
+                    # Search matches using prefix matching and find the closest instance
+                    matching_instances = []
+                    for k, v in landmarks.items():
+                        base_k = k.split('_')[0] if '_' in k else k
+                        if base_k == target_label:
+                            dist = math.hypot(v["x"] - rx, v["y"] - ry)
+                            matching_instances.append((dist, v))
+                            
+                    if matching_instances:
+                        # Sort by distance and pick closest
+                        matching_instances.sort(key=lambda item: item[0])
+                        lm = matching_instances[0][1]
                         tx, ty = lm["x"], lm["y"]
-                        
-                        # Get current state
-                        state = await self.client.get_state()
-                        rx, ry, _ = state.position
-                        ryaw = state.orientation.yaw_deg
                         
                         # Calculate steering direction and distance
                         dx = tx - rx
