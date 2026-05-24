@@ -33,5 +33,6 @@ select = ["E", "F", "I", "W"]
 ignore = []
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 norecursedirs = ["tests/experimental"]
 

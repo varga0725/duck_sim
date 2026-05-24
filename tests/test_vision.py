@@ -6,7 +6,10 @@ from duck_agent_sim.vision.yolo_detector import YOLODetector
 from duck_agent_sim.vision.tracker import CentroidTracker
 from duck_agent_sim.vision import get_visible_objects, find_object, get_tracking_target
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 def test_detector_initialization():
     detector = YOLODetector()
@@ -40,7 +43,10 @@ def test_detections_schema_and_tracker():
     assert tracked_f2[0]["tracking_id"] == 1
     assert tracked_f2[1]["tracking_id"] == 2
 
-def test_api_endpoints():
+def test_api_endpoints(client):
+    # Let the vision system start and populate the state
+    time.sleep(0.5)
+
     # 1. GET /vision/frame
     response = client.get("/vision/frame")
     assert response.status_code == 200
@@ -69,7 +75,7 @@ def test_api_endpoints():
     assert "vision_fps" in state
     assert "last_update_sec" in state
 
-def test_agent_integration_helpers():
+def test_agent_integration_helpers(client):
     # Let the vision system start and populate the state
     time.sleep(0.5)
     

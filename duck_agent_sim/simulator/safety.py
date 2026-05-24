@@ -164,3 +164,44 @@ def check_servo_runaway(target_pos: list[float], present_pos: list[float], thres
             return True
     return False
 
+
+def check_impossible_pose(joint_positions: list[float]) -> bool:
+    """
+    Returns True if joint angles are outside the physical limits of the robot
+    or represent an impossible/colliding pose.
+    """
+    import numpy as np
+    from duck_agent_sim.simulator.policy_contract import ACTUATOR_CTRL_RANGES
+    
+    if len(joint_positions) != 14:
+        return True
+        
+    for idx, pos in enumerate(joint_positions):
+        limit_min, limit_max = ACTUATOR_CTRL_RANGES[idx]
+        # Add small 0.05 rad tolerance to allow for noise, but enforce limits
+        if pos < limit_min - 0.05 or pos > limit_max + 0.05:
+            return True
+            
+    # Self-collision: check if ankle and knee are conflicting (e.g., knee and ankle overlap)
+    # Left leg (knee = idx 3, ankle = idx 4)
+    left_knee = joint_positions[3]
+    left_ankle = joint_positions[4]
+    if left_knee > 1.2 and left_ankle < -1.2:
+        return True
+        
+    # Right leg (knee = idx 12, ankle = idx 13)
+    right_knee = joint_positions[12]
+    right_ankle = joint_positions[13]
+    if right_knee > 1.2 and right_ankle < -1.2:
+        return True
+        
+    return False
+
+
+def check_battery_thermal_limit(battery_temp: float, limit_c: float = 60.0) -> bool:
+    """
+    Returns True if battery temperature meets or exceeds the critical thermal limit.
+    """
+    return battery_temp >= limit_c
+
+

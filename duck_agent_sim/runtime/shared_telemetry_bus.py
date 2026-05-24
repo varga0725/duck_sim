@@ -24,6 +24,7 @@ class SensorsTelemetryStruct(ctypes.Structure):
         ("quat_x", ctypes.c_double),
         ("quat_y", ctypes.c_double),
         ("quat_z", ctypes.c_double),
+        ("battery_temp", ctypes.c_double),
     ]
 
 class ServosTelemetryStruct(ctypes.Structure):

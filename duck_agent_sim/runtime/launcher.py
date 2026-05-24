@@ -98,6 +98,7 @@ class ProcessLauncher:
         from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
         from duck_agent_sim.hardware.sts3215_driver import STS3215Driver
         from duck_agent_sim.runtime.robot_state_machine import RobotStateMachine
+        from duck_agent_sim.simulator.safety import check_servo_runaway, check_impossible_pose
         
         bus = SharedTelemetryBus(create=False)
         servo = STS3215Driver()
@@ -105,12 +106,15 @@ class ProcessLauncher:
         cmd = bus.get_command_ref()
         fsm = RobotStateMachine(servo, state, cmd)
         
+        runaway_ticks = 0
+        
         try:
             while self._running:
                 start_tick = time.monotonic()
                 # Read sensors from bus (which are updated by sensor_fusion)
                 sensor_ref = bus.get_sensors_ref()
                 battery_voltage = sensor_ref.battery_voltage
+                battery_temp = getattr(sensor_ref, "battery_temp", 25.0)
                 
                 # Fetch max servo temp
                 servos_ref = bus.get_servos_ref()
@@ -118,10 +122,21 @@ class ProcessLauncher:
                 
                 # Run safety checks
                 fallen = state.fallen
-                runaway = False  # Derived by comparing joint command vs target inside FSM
+                
+                # Servo runaway detection (discrepancy > 15 deg for > 5 ticks)
+                mismatch = check_servo_runaway(list(servos_ref.target_pos), list(servos_ref.present_pos), 15.0)
+                if mismatch:
+                    runaway_ticks += 1
+                else:
+                    runaway_ticks = 0
+                    
+                # Check for impossible pose command
+                unsafe_pose = check_impossible_pose(list(servos_ref.target_pos))
+                
+                runaway = (runaway_ticks > 5) or unsafe_pose
                 
                 # FSM Tick
-                fsm.step(battery_voltage, max_temp, fallen, runaway)
+                fsm.step(battery_voltage, max_temp, fallen, runaway, battery_temp)
                 
                 # Sleep exactly until next tick (50Hz = 20ms)
                 elapsed = time.monotonic() - start_tick
@@ -138,6 +153,7 @@ class ProcessLauncher:
         configure_process_rt(core_id=2, policy_name="SCHED_FIFO", priority=50)
         logger.info("Sensor Fusion & State Estimation Loop running...")
         
+        import numpy as np
         from duck_agent_sim.runtime.shared_telemetry_bus import SharedTelemetryBus
         from duck_agent_sim.hardware.bno055_driver import BNO055Driver
         from duck_agent_sim.hardware.foot_switch_driver import FootSwitchDriver
@@ -163,11 +179,21 @@ class ProcessLauncher:
                 gyro = imu.read_gyroscope()
                 quat = imu.read_quaternion()
                 left_c, right_c = feet.read_contacts()
-                voltage = batt.read_voltage()
+                
+                # Sum the present loads of all 14 servos to get total servo current draw
+                # present_load is in centiamperes in simulated mode.
+                total_servo_load = sum(servos_ref.present_load[i] for i in range(14))
+                total_current = (total_servo_load / 100.0) + 0.7
+                voltage = batt.read_voltage(total_current)
+                
+                # Fetch battery status for temperature
+                batt_status = batt.get_status()
+                battery_temp = batt_status.get("temperature", 25.0)
                 
                 # 2. Write raw sensor state to shared bus
                 sensors_ref.timestamp = time.time()
                 sensors_ref.battery_voltage = voltage
+                sensors_ref.battery_temp = battery_temp
                 sensors_ref.left_contact = left_c
                 sensors_ref.right_contact = right_c
                 sensors_ref.accel_x, sensors_ref.accel_y, sensors_ref.accel_z = accel

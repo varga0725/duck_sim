@@ -91,7 +91,8 @@ class RobotStateMachine:
              battery_voltage: float, 
              max_servo_temp: int, 
              fallen_detected: bool, 
-             servo_runaway_detected: bool):
+             servo_runaway_detected: bool,
+             battery_temp: float = 25.0):
         """Processes FSM updates once per control loop tick (50Hz)."""
         now = time.time()
         
@@ -109,6 +110,12 @@ class RobotStateMachine:
         if max_servo_temp >= 68:  # Thermo-cutoff limit
             if self.state not in ("EMERGENCY_STOP", "SAFE_IDLE", "BOOT"):
                 logger.critical(f"THERMAL LIMIT EXCEEDED ({max_servo_temp}C)! Forcing emergency torque-off.")
+                self.transition_to("EMERGENCY_STOP")
+                return
+
+        if battery_temp >= 60.0:  # Battery thermal limit cutoff
+            if self.state not in ("EMERGENCY_STOP", "SAFE_IDLE", "BOOT"):
+                logger.critical(f"BATTERY THERMAL LIMIT EXCEEDED ({battery_temp}C)! Forcing emergency torque-off.")
                 self.transition_to("EMERGENCY_STOP")
                 return
 

@@ -44,6 +44,11 @@ class STS3215Driver:
         self._mock_temperatures: Dict[int, int] = {i: 35 for i in range(1, 15)}
         self._mock_currents: Dict[int, float] = {i: 0.0 for i in range(1, 15)}
         
+        # High-Fidelity kinetic simulation states
+        self._target_positions: Dict[int, int] = {i: 2048 for i in range(1, 15)}
+        self._present_positions: Dict[int, float] = {i: 2048.0 for i in range(1, 15)}
+        self._last_update_time: Dict[int, float] = {i: time.time() for i in range(1, 15)}
+        
         self.connect()
 
     def connect(self) -> bool:
@@ -143,7 +148,7 @@ class STS3215Driver:
         position_ticks = max(0, min(4095, position_ticks))
         
         if not self.is_hardware:
-            self._mock_positions[servo_id] = position_ticks
+            self._target_positions[servo_id] = position_ticks
             return True
             
         pos_h, pos_l = (position_ticks >> 8) & 0xFF, position_ticks & 0xFF
@@ -166,7 +171,7 @@ class STS3215Driver:
             
         if not self.is_hardware:
             for servo_id, pos in servo_targets:
-                self._mock_positions[servo_id] = pos
+                self._target_positions[servo_id] = pos
             return
             
         # INST_SYNC_WRITE parameter format:
@@ -188,13 +193,59 @@ class STS3215Driver:
         Returns: (position_ticks, load_ticks, temp_c)
         """
         if not self.is_hardware:
-            # Add small random noise to mock values to simulate sensor telemetry
+            import math
             import random
-            pos = self._mock_positions.get(servo_id, 2048)
-            temp = self._mock_temperatures.get(servo_id, 35) + random.choice([-1, 0, 1])
-            self._mock_temperatures[servo_id] = max(20, min(80, temp))
-            load = int(self._mock_currents.get(servo_id, 0.0) * 100) + random.randint(-5, 5)
-            return pos, load, temp
+            
+            now = time.time()
+            dt = max(0.001, now - self._last_update_time.get(servo_id, now))
+            self._last_update_time[servo_id] = now
+            if dt > 1.0:
+                dt = 0.02
+                
+            target = self._target_positions.get(servo_id, 2048)
+            present = self._present_positions.get(servo_id, 2048.0)
+            
+            # Max speed of 4096 ticks per second (approx 6.28 rad/s)
+            max_step = 4096.0 * dt
+            diff = target - present
+            if abs(diff) <= max_step:
+                present = float(target)
+                speed_rad_s = 0.0
+            else:
+                step = max_step if diff > 0 else -max_step
+                present += step
+                speed_rad_s = (abs(step) / 4096.0) * 2 * math.pi / dt
+
+            self._present_positions[servo_id] = present
+            self._mock_positions[servo_id] = int(round(present))
+            
+            # Estimate torque based on tracking error (1 tick = 2*pi/4096 = 0.00153 rad)
+            error_rad = abs(target - present) * 0.00153
+            torque_load = min(3.23, 5.0 * error_rad)
+            
+            # If torque enabled
+            is_enabled = self._mock_torque.get(servo_id, True)  # Default True for simulation robustness
+            if is_enabled:
+                i_idle = 0.05
+                i_active = i_idle + 0.1 * speed_rad_s + 0.6 * torque_load
+            else:
+                i_active = 0.0
+                
+            self._mock_currents[servo_id] = i_active
+            
+            # Winding heating winding resistance is 1.5 Ohms
+            p_loss = (i_active ** 2) * 1.5
+            temp = self._mock_temperatures.get(servo_id, 35)
+            dT = 0.05 * p_loss - 0.005 * (temp - 25.0)
+            new_temp = temp + dT * dt
+            new_temp = max(20.0, min(100.0, new_temp))
+            self._mock_temperatures[servo_id] = int(round(new_temp))
+            
+            # Load returned as load ticks (current in centiamperes)
+            load = int(i_active * 100) + random.randint(-2, 2)
+            load = max(0, load)
+            
+            return int(round(present)), load, int(round(new_temp))
 
         # Read starting at REG_PRESENT_POSITION (0x38), length = 9 bytes:
         # Position (2 bytes), Speed (2 bytes), Load (2 bytes), Voltage (1 byte), Temp (1 byte), Current (2 bytes)

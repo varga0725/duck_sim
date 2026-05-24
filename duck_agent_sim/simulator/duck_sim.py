@@ -232,6 +232,9 @@ class MockDuckSimulator(DuckSimulator):
             fallen=False,
             last_command="reset"
         )
+        self._battery_capacity_mah = 1500.0
+        self._battery_temp_c = 25.0
+        self._battery_voltage = 12.6
         self._double_buffered_state.update_write_state(self._state)
         self._double_buffered_state.swap()
         if hasattr(self, "spatial_model"):
@@ -554,6 +557,29 @@ class MockDuckSimulator(DuckSimulator):
         else:
             self._state.status = "idle"
 
+        # Update simulated battery in MockDuckSimulator
+        if not hasattr(self, "_battery_capacity_mah"):
+            self._battery_capacity_mah = 1500.0
+            self._battery_temp_c = 25.0
+            self._battery_voltage = 12.6
+            
+        is_moving = (abs(control.linear_x) > 0.01 or abs(control.yaw) > 0.01)
+        current_amps = 3.5 if is_moving else 0.8
+        
+        # Capacity decay
+        discharged_mah = current_amps * dt / 3.6
+        self._battery_capacity_mah = max(0.0, self._battery_capacity_mah - discharged_mah)
+        
+        soc = self._battery_capacity_mah / 1500.0
+        v_nominal = 9.9 + 2.7 * soc
+        r_internal = 0.05
+        self._battery_voltage = max(5.0, v_nominal - current_amps * r_internal)
+        
+        # Temp modeling
+        p_loss = (current_amps ** 2) * r_internal
+        dT = 0.02 * p_loss - 0.002 * (self._battery_temp_c - 25.0)
+        self._battery_temp_c = max(25.0, self._battery_temp_c + dT * dt)
+
         # 3. Kinematic position/orientation calculations
         yaw_rad = math.radians(self._state.orientation.yaw_deg)
         pos_x, pos_y, pos_z = self._state.position
@@ -567,7 +593,6 @@ class MockDuckSimulator(DuckSimulator):
 
         # 4. Waddling Motion Simulation (to make the mock feel alive & wowed)
         # If moving, waddle!
-        is_moving = (abs(control.linear_x) > 0.01 or abs(control.yaw) > 0.01)
         if is_moving:
             waddle_freq = 8.0  # radians per second
             waddle_phase = self._state.sim_time * waddle_freq
@@ -596,10 +621,11 @@ class MockDuckSimulator(DuckSimulator):
         self._state.orientation.yaw_deg = new_yaw_deg
 
         # 5. Safety Monitoring & Enforcement
-        if is_fallen(self._state, safety):
+        # Check brownout or thermal runaway
+        if self._battery_voltage < 9.9 or self._battery_temp_c >= 60.0 or is_fallen(self._state, safety):
             self._state.fallen = True
             self._state.status = "fallen"
-            if safety.stop_on_fall:
+            if safety.stop_on_fall or self._battery_voltage < 9.9 or self._battery_temp_c >= 60.0:
                 # Stop linear velocities immediately
                 control.linear_x = 0.0
                 control.linear_y = 0.0

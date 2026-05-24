@@ -27,6 +27,12 @@ class BatteryMonitor:
         self.is_hardware = False
         self._start_time = time.time()
         
+        # High-Fidelity simulated battery states (3S LiPo)
+        self._capacity_mah = 1500.0
+        self._temperature_c = 25.0
+        self._last_time = time.time()
+        self._last_voltage = 12.6
+        
         self.connect()
 
     def connect(self) -> bool:
@@ -43,16 +49,42 @@ class BatteryMonitor:
             logger.warning(f"Could not open ADS1115 I2C connection ({e}). Falling back to simulated battery telemetry.")
             return False
 
-    def read_voltage(self) -> float:
+    def read_voltage(self, current_amps: float = 0.0) -> float:
         """
         Reads total battery voltage.
-        In simulated mode, it decays the voltage slowly from 12.4V to simulate battery drain.
+        In simulated mode, it updates capacity based on current load, models internal resistance
+        voltage dip, and models battery temperature rise.
         """
         if not self.is_hardware:
-            # Simulate battery discharge: decay 0.05V per minute, starting at 12.4V
-            elapsed_min = (time.time() - self._start_time) / 60.0
-            voltage = max(9.5, 12.4 - elapsed_min * 0.05)
-            return voltage
+            now = time.time()
+            dt = max(0.001, now - self._last_time)
+            self._last_time = now
+            
+            # Prevent huge time jumps if first run / debugging
+            if dt > 1.0:
+                dt = 0.02
+                
+            # Update battery capacity: current_amps * dt (seconds) converted to mAh
+            discharged_mah = current_amps * dt / 3.6
+            self._capacity_mah = max(0.0, self._capacity_mah - discharged_mah)
+            
+            # State of Charge (SoC) from 0.0 to 1.0
+            soc = self._capacity_mah / 1500.0
+            
+            # Nominal voltage varies from 9.9V (empty) to 12.6V (full)
+            v_nominal = 9.9 + 2.7 * soc
+            
+            # Internal resistance voltage dip: V = V_nominal - I * R_internal
+            r_internal = 0.05  # Ohms
+            v_actual = v_nominal - current_amps * r_internal
+            
+            # Battery temperature heating (I^2 * R) and cooling (convective to ambient 25C)
+            p_loss = (current_amps ** 2) * r_internal
+            dT = 0.02 * p_loss - 0.002 * (self._temperature_c - 25.0)
+            self._temperature_c = max(25.0, self._temperature_c + dT * dt)
+            
+            self._last_voltage = max(5.0, v_actual)
+            return self._last_voltage
 
         try:
             # Configure ADS1115 to read channel 0 with FSR = 6.144V
@@ -77,14 +109,16 @@ class BatteryMonitor:
             # LSB value for 6.144V FSR is 0.1875 mV
             measured_volts = raw * 0.0001875
             battery_volts = measured_volts * divider_ratio
-            return max(0.0, battery_volts)
+            self._last_voltage = max(0.0, battery_volts)
+            return self._last_voltage
         except Exception as e:
             logger.error(f"Error reading battery ADC: {e}")
-            return 11.5  # Safe nominal fallback on read error
+            self._last_voltage = 11.5  # Safe nominal fallback on read error
+            return self._last_voltage
 
     def get_status(self) -> Dict[str, Any]:
         """Returns diagnostic battery state telemetry."""
-        volts = self.read_voltage()
+        volts = self._last_voltage
         cell_volts = volts / CELLS
         
         # Calculate approximate charge percentage
@@ -104,5 +138,6 @@ class BatteryMonitor:
             "percentage": round(pct, 1),
             "status": status,
             "is_critical": status == "critical",
-            "is_low": status == "low" or status == "critical"
+            "is_low": status == "low" or status == "critical",
+            "temperature": round(self._temperature_c, 1)
         }
