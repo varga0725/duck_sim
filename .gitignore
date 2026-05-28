@@ -12,6 +12,10 @@ env/
 .benchmarks/
 .env
 
+.planning/
+.hermes/
+.vscode/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -37,3 +41,6 @@ temp.xml
 dist/
 build/
 
+*.png
+*.csv
+*.pdf
